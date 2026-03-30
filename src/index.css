@@ -175,3 +175,7 @@
 .pdf-capture span.italic.text-gray-400 {
   display: none !important;
 }
+
+.pdf-capture tr[data-empty-line] {
+  display: none !important;
+}

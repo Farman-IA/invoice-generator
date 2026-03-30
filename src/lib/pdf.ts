@@ -198,37 +198,18 @@ export async function generatePDF(
 
     const imgWidthPx = canvas.width / 2
     const imgHeightPx = canvas.height / 2
-    const scale = pageWidth / imgWidthPx
-    const scaledHeight = imgHeightPx * scale
 
-    if (scaledHeight <= pageHeight) {
-      const imgData = canvas.toDataURL('image/jpeg', 0.98)
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, scaledHeight)
-    } else {
-      const pxPerPage = (pageHeight / scale) * 2
-      const totalPages = Math.ceil(canvas.height / pxPerPage)
+    // Scale-to-fit : si le contenu depasse 1 page A4,
+    // reduire proportionnellement pour tout faire tenir
+    const scaleX = pageWidth / imgWidthPx
+    const scaleY = pageHeight / imgHeightPx
+    const fitScale = Math.min(scaleX, scaleY)
 
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) pdf.addPage()
+    const finalWidth = imgWidthPx * fitScale
+    const finalHeight = imgHeightPx * fitScale
 
-        const sliceHeight = Math.min(
-          pxPerPage,
-          canvas.height - page * pxPerPage
-        )
-        const sliceCanvas = document.createElement('canvas')
-        sliceCanvas.width = canvas.width
-        sliceCanvas.height = sliceHeight
-
-        const ctx = sliceCanvas.getContext('2d')!
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
-        ctx.drawImage(canvas, 0, -page * pxPerPage)
-
-        const imgData = sliceCanvas.toDataURL('image/jpeg', 0.98)
-        const displayHeight = (sliceHeight / 2) * scale
-        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, displayHeight)
-      }
-    }
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    pdf.addImage(imgData, 'JPEG', 0, 0, finalWidth, finalHeight)
 
     pdf.save(filename)
   } finally {

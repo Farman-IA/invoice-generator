@@ -40,6 +40,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
               <tr
                 key={item.id}
                 className="group border-b border-gray-200 hover:bg-gray-50/50"
+                data-empty-line={!item.description && item.unitPrice === 0 ? '' : undefined}
               >
                 <td className="py-2.5 pr-2">
                   <InlineEdit
