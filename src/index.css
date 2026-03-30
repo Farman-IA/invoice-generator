@@ -186,7 +186,7 @@
 
 /* Mode capture PDF : afficher le texte TVA, cacher le Select */
 .pdf-capture .pdf-vat-text {
-  display: inline !important;
+  display: block !important;
 }
 
 .pdf-capture .pdf-vat-select {
