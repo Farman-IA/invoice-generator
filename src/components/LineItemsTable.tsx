@@ -22,15 +22,23 @@ interface LineItemsTableProps {
 export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTableProps) {
   return (
     <div className="mt-8">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+        <colgroup>
+          <col />
+          <col style={{ width: 60 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 80 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 30 }} />
+        </colgroup>
         <thead>
           <tr className="border-b-2 border-gray-800 text-left">
             <th className="pb-2 font-semibold">Description</th>
-            <th className="pb-2 font-semibold text-center w-[60px]">Qté</th>
-            <th className="pb-2 font-semibold text-right w-[120px]">Prix unitaire HT</th>
-            <th className="pb-2 font-semibold text-center w-[80px]">TVA</th>
-            <th className="pb-2 font-semibold text-right w-[120px]">Total HT</th>
-            <th className="w-[30px]"></th>
+            <th className="pb-2 font-semibold text-center">Qté</th>
+            <th className="pb-2 font-semibold text-right px-2">Prix unitaire HT</th>
+            <th className="pb-2 font-semibold text-center px-2">TVA</th>
+            <th className="pb-2 font-semibold text-right px-2">Total HT</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -50,7 +58,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     className="w-full"
                   />
                 </td>
-                <td className="py-2.5 px-1 text-center">
+                <td className="py-2.5 px-2 text-center">
                   <InlineEdit
                     value={String(item.quantity)}
                     onChange={(v) => onUpdate(item.id, { quantity: Math.max(0, Number(v) || 0) })}
@@ -58,7 +66,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     className="text-center w-full"
                   />
                 </td>
-                <td className="py-2.5 px-1 text-right">
+                <td className="py-2.5 px-2 text-right">
                   <InlineEdit
                     value={String(item.unitPrice)}
                     onChange={(v) => onUpdate(item.id, { unitPrice: Math.max(0, Number(v) || 0) })}
@@ -66,7 +74,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     className="text-right w-full"
                   />
                 </td>
-                <td className="py-2.5 px-1 text-center">
+                <td className="py-2.5 px-2 text-center">
                   <div>
                     <Select
                       value={String(item.vatRate)}
@@ -89,7 +97,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     <span className="pdf-vat-text hidden text-sm">{item.vatRate.toLocaleString('fr-FR')} %</span>
                   </div>
                 </td>
-                <td className="py-2.5 pl-1 text-right font-medium tabular-nums">
+                <td className="py-2.5 px-2 text-right font-medium tabular-nums">
                   {formatEuro(lineTotal)} €
                 </td>
                 <td className="py-2.5 pl-1">
