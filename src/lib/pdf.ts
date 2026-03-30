@@ -187,6 +187,11 @@ export async function generatePDF(
     el.style.width = '100%'
   })
 
+  // Cacher les champs non renseignés (LabeledField vides)
+  element.querySelectorAll<HTMLElement>('[data-empty]').forEach((el) => {
+    el.style.display = 'none'
+  })
+
   void element.offsetHeight
 
   // Convertir oklch → rgb pour html2canvas
@@ -234,6 +239,9 @@ export async function generatePDF(
       el.style.display = ''
       el.style.textAlign = ''
       el.style.width = ''
+    })
+    element.querySelectorAll<HTMLElement>('[data-empty]').forEach((el) => {
+      el.style.display = ''
     })
     element.classList.remove('pdf-capture')
   }

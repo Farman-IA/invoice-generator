@@ -35,7 +35,7 @@ function LabeledField({
   className?: string
 }) {
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-1" data-empty={!value ? '' : undefined}>
       <span className="text-gray-400">{label} :</span>
       <InlineEdit
         value={value}

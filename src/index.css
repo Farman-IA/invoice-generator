@@ -180,6 +180,10 @@
   display: none !important;
 }
 
+.pdf-capture [data-empty] {
+  display: none !important;
+}
+
 .pdf-capture tr[data-empty-line] {
   display: none !important;
 }
