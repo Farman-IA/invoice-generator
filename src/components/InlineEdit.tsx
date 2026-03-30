@@ -27,8 +27,9 @@ export function InlineEdit({
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus()
-      if (as !== 'date' && inputRef.current instanceof HTMLInputElement) {
-        inputRef.current.select()
+      if (as !== 'date') {
+        // requestAnimationFrame garantit que l'input est rendu avant de sélectionner
+        requestAnimationFrame(() => inputRef.current?.select())
       }
     }
   }, [isEditing, as])
