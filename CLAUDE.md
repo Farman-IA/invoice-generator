@@ -20,3 +20,4 @@ Application web de creation de factures pour freelances et TPE/PME.
 - **JAMAIS** de cle API dans le code — toujours dans .env
 - Les imports utilisent le raccourci `@/` qui pointe vers `src/`
 - Les composants UI vont dans `src/components/ui/`
+- **TOUJOURS** faire des commits reguliers au fil du travail — ne pas accumuler trop de modifications avant de sauvegarder. Committer a chaque etape logique (nouveau composant, nouvelle fonctionnalite, correction de bug, etc.)

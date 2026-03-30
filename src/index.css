@@ -128,3 +128,20 @@
     @apply font-sans;
     }
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .invoice-paper {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    max-width: 100% !important;
+  }
+}
