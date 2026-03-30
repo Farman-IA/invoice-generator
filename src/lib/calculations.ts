@@ -37,7 +37,7 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
 
   for (const [rate, baseHT] of vatMap.entries()) {
     const roundedBase = Math.round(baseHT * 100) / 100
-    const vatAmount = Math.round(roundedBase * (rate / 100) * 100) / 100
+    const vatAmount = Math.ceil(roundedBase * (rate / 100) * 100) / 100
     totalVAT += vatAmount
     vatBreakdown.push({ rate, baseHT: roundedBase, vatAmount })
   }

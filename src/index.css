@@ -146,7 +146,7 @@
   }
 }
 
-/* Mode capture PDF : cacher uniquement les elements interactifs */
+/* Mode capture PDF : cacher les elements interactifs + compacter pour A4 */
 .pdf-capture button:not([data-slot="select-trigger"]) {
   display: none !important;
 }
@@ -157,4 +157,21 @@
 
 .pdf-capture .invoice-paper {
   box-shadow: none !important;
+  padding: 8mm !important;
+}
+
+.pdf-capture .invoice-paper > .mb-10 {
+  margin-bottom: 1.5rem !important;
+}
+
+.pdf-capture .invoice-paper > .mb-8 {
+  margin-bottom: 1rem !important;
+}
+
+.pdf-capture .invoice-paper > .mt-12 {
+  margin-top: 1.5rem !important;
+}
+
+.pdf-capture span.italic.text-gray-400 {
+  display: none !important;
 }
