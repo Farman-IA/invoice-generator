@@ -9,6 +9,27 @@ function sanitizeFilename(str: string): string {
     .trim()
 }
 
+/**
+ * Prépare l'élément pour la capture PDF :
+ * - Force la largeur à 210mm (A4)
+ * - Ajoute la classe .pdf-capture qui cache les éléments interactifs
+ * Retourne une fonction pour tout restaurer.
+ */
+function prepareForPdf(element: HTMLElement): () => void {
+  const prevWidth = element.style.width
+  const prevMaxWidth = element.style.maxWidth
+
+  element.style.width = '210mm'
+  element.style.maxWidth = '210mm'
+  element.classList.add('pdf-capture')
+
+  return () => {
+    element.style.width = prevWidth
+    element.style.maxWidth = prevMaxWidth
+    element.classList.remove('pdf-capture')
+  }
+}
+
 export async function generatePDF(
   element: HTMLElement,
   invoiceNumber: string,
@@ -19,58 +40,63 @@ export async function generatePDF(
   const cleanNumber = sanitizeFilename(invoiceNumber) || 'Facture'
   const filename = `Facture_${cleanNumber}_${cleanClient}_${date}.pdf`
 
-  // html-to-image utilise le moteur de rendu natif du navigateur (SVG foreignObject)
-  // ce qui supporte oklch et toutes les fonctionnalités CSS modernes
-  const canvas = await toCanvas(element, {
-    pixelRatio: 2,
-    cacheBust: true,
-  })
+  const restore = prepareForPdf(element)
 
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  })
+  try {
+    // html-to-image utilise le moteur de rendu natif du navigateur
+    // qui supporte oklch et toutes les fonctionnalités CSS modernes
+    const canvas = await toCanvas(element, {
+      pixelRatio: 2,
+      cacheBust: true,
+    })
 
-  const pageWidth = pdf.internal.pageSize.getWidth()
-  const pageHeight = pdf.internal.pageSize.getHeight()
-  const margin = 10
-  const contentWidth = pageWidth - 2 * margin
-  const contentHeight = pageHeight - 2 * margin
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
 
-  // Dimensions de l'image en unités réelles (÷2 car pixelRatio=2)
-  const imgWidthPx = canvas.width / 2
-  const imgHeightPx = canvas.height / 2
-  const scale = contentWidth / imgWidthPx
-  const scaledHeight = imgHeightPx * scale
+    const pageWidth = 210
+    const pageHeight = 297
 
-  if (scaledHeight <= contentHeight) {
-    // Tient sur une seule page
-    const imgData = canvas.toDataURL('image/jpeg', 0.98)
-    pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, scaledHeight)
-  } else {
-    // Plusieurs pages : découper le canvas en tranches
-    const pxPerPage = (contentHeight / scale) * 2
-    const totalPages = Math.ceil(canvas.height / pxPerPage)
+    // Pas de marge PDF : l'élément a déjà son propre padding (p-12)
+    const imgWidthPx = canvas.width / 2
+    const imgHeightPx = canvas.height / 2
+    const scale = pageWidth / imgWidthPx
+    const scaledHeight = imgHeightPx * scale
 
-    for (let page = 0; page < totalPages; page++) {
-      if (page > 0) pdf.addPage()
+    if (scaledHeight <= pageHeight) {
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, scaledHeight)
+    } else {
+      // Plusieurs pages : découper le canvas en tranches
+      const pxPerPage = (pageHeight / scale) * 2
+      const totalPages = Math.ceil(canvas.height / pxPerPage)
 
-      const sliceHeight = Math.min(pxPerPage, canvas.height - page * pxPerPage)
-      const sliceCanvas = document.createElement('canvas')
-      sliceCanvas.width = canvas.width
-      sliceCanvas.height = sliceHeight
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage()
 
-      const ctx = sliceCanvas.getContext('2d')!
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
-      ctx.drawImage(canvas, 0, -page * pxPerPage)
+        const sliceHeight = Math.min(
+          pxPerPage,
+          canvas.height - page * pxPerPage
+        )
+        const sliceCanvas = document.createElement('canvas')
+        sliceCanvas.width = canvas.width
+        sliceCanvas.height = sliceHeight
 
-      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.98)
-      const displayHeight = (sliceHeight / 2) * scale
-      pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, displayHeight)
+        const ctx = sliceCanvas.getContext('2d')!
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
+        ctx.drawImage(canvas, 0, -page * pxPerPage)
+
+        const imgData = sliceCanvas.toDataURL('image/jpeg', 0.98)
+        const displayHeight = (sliceHeight / 2) * scale
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, displayHeight)
+      }
     }
-  }
 
-  pdf.save(filename)
+    pdf.save(filename)
+  } finally {
+    restore()
+  }
 }

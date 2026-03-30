@@ -145,3 +145,28 @@
     max-width: 100% !important;
   }
 }
+
+/* Mode capture PDF : cacher les elements interactifs */
+.pdf-capture button:not([data-slot="select-trigger"]) {
+  display: none !important;
+}
+
+.pdf-capture [data-slot="select-trigger"] svg {
+  display: none !important;
+}
+
+.pdf-capture span.italic {
+  display: none !important;
+}
+
+.pdf-capture .border-dashed:not(:has(img)) {
+  display: none !important;
+}
+
+.pdf-capture .cursor-text {
+  cursor: default !important;
+}
+
+.pdf-capture .invoice-paper {
+  box-shadow: none !important;
+}
