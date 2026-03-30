@@ -184,6 +184,12 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
             </h2>
             <div className="space-y-0.5">
               <InlineEdit
+                value={issuer.companyName}
+                onChange={(v) => onUpdateIssuer({ companyName: v })}
+                placeholder={PLACEHOLDERS.issuer.companyName}
+                className="font-semibold"
+              />
+              <InlineEdit
                 value={issuer.address}
                 onChange={(v) => onUpdateIssuer({ address: v })}
                 placeholder={PLACEHOLDERS.issuer.address}
