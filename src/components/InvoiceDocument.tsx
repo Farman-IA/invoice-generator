@@ -258,7 +258,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
 
         {/* ========== METADATA ========== */}
         <div className="flex flex-wrap gap-x-8 gap-y-1 mb-6 pb-4 border-b border-gray-200 text-xs">
-          <div className="flex gap-1">
+          <div className="flex gap-1 whitespace-nowrap">
             <span className="text-gray-400">Date de livraison :</span>
             <InlineEdit
               value={invoice.deliveryDate}
@@ -267,7 +267,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               className="text-xs"
             />
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 whitespace-nowrap">
             <span className="text-gray-400">Date d'échéance :</span>
             <InlineEdit
               value={invoice.dueDate}
@@ -276,7 +276,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               className="text-xs"
             />
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 whitespace-nowrap">
             <span className="text-gray-400">N° commande :</span>
             <InlineEdit
               value={invoice.purchaseOrder}

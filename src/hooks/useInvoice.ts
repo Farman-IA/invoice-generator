@@ -44,7 +44,9 @@ export function useInvoice() {
       localStorage.getItem(STORAGE_KEYS.CLIENT_CURRENT) !== null ||
       localStorage.getItem(STORAGE_KEYS.INVOICE_CURRENT) !== null
     if (hasData) {
-      toast.success('Données restaurées', { duration: 2000 })
+      const id = toast.success('Données restaurées')
+      const timer = setTimeout(() => toast.dismiss(id), 3000)
+      return () => clearTimeout(timer)
     }
   }, [])
 

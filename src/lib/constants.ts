@@ -4,17 +4,17 @@ export const VAT_RATES: { value: VatRate; label: string; description: string }[]
   {
     value: 5.5,
     label: '5,5 %',
-    description: 'Produits alimentaires à consommation différée',
+    description: 'Alimentaire',
   },
   {
     value: 10,
     label: '10 %',
-    description: 'Restauration sur place / consommation immédiate',
+    description: 'Restauration',
   },
   {
     value: 20,
     label: '20 %',
-    description: 'Boissons alcoolisées, location de salle, services',
+    description: 'Alcool / Services',
   },
 ]
 
