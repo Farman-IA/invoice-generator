@@ -25,12 +25,12 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b-2 border-gray-800 text-left">
-            <th className="pb-2 font-semibold w-[40%]">Description</th>
-            <th className="pb-2 font-semibold text-right w-[10%]">Qté</th>
-            <th className="pb-2 font-semibold text-right w-[18%]">Prix unitaire HT</th>
-            <th className="pb-2 font-semibold text-center w-[14%]">TVA</th>
-            <th className="pb-2 font-semibold text-right w-[14%]">Total HT</th>
-            <th className="w-[4%]"></th>
+            <th className="pb-2 font-semibold">Description</th>
+            <th className="pb-2 font-semibold text-center w-[60px]">Qté</th>
+            <th className="pb-2 font-semibold text-right w-[120px]">Prix unitaire HT</th>
+            <th className="pb-2 font-semibold text-center w-[80px]">TVA</th>
+            <th className="pb-2 font-semibold text-right w-[120px]">Total HT</th>
+            <th className="w-[30px]"></th>
           </tr>
         </thead>
         <tbody>
@@ -50,15 +50,15 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     className="w-full"
                   />
                 </td>
-                <td className="py-2.5 px-1">
+                <td className="py-2.5 px-1 text-center">
                   <InlineEdit
                     value={String(item.quantity)}
                     onChange={(v) => onUpdate(item.id, { quantity: Math.max(0, Number(v) || 0) })}
                     as="number"
-                    className="text-right w-full"
+                    className="text-center w-full"
                   />
                 </td>
-                <td className="py-2.5 px-1">
+                <td className="py-2.5 px-1 text-right">
                   <InlineEdit
                     value={String(item.unitPrice)}
                     onChange={(v) => onUpdate(item.id, { unitPrice: Math.max(0, Number(v) || 0) })}
@@ -66,8 +66,8 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     className="text-right w-full"
                   />
                 </td>
-                <td className="py-2.5 px-1">
-                  <div className="relative">
+                <td className="py-2.5 px-1 text-center">
+                  <div>
                     <Select
                       value={String(item.vatRate)}
                       onValueChange={(v) => onUpdate(item.id, { vatRate: Number(v) as VatRate })}
