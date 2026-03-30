@@ -123,26 +123,6 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               onChange={handleLogoUpload}
               className="hidden"
             />
-            <div className="font-bold text-base">
-              <InlineEdit
-                value={issuer.companyName}
-                onChange={(v) => onUpdateIssuer({ companyName: v })}
-                placeholder={PLACEHOLDERS.issuer.companyName}
-                className="font-bold text-base"
-              />
-            </div>
-            <InlineEdit
-              value={issuer.legalForm}
-              onChange={(v) => onUpdateIssuer({ legalForm: v })}
-              placeholder={PLACEHOLDERS.issuer.legalForm}
-              className="text-gray-600 text-xs"
-            />
-            <InlineEdit
-              value={issuer.phone}
-              onChange={(v) => onUpdateIssuer({ phone: v })}
-              placeholder={PLACEHOLDERS.issuer.phone}
-              className="text-gray-500 text-xs"
-            />
           </div>
 
           {/* Invoice title */}
@@ -188,6 +168,18 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 onChange={(v) => onUpdateIssuer({ companyName: v })}
                 placeholder={PLACEHOLDERS.issuer.companyName}
                 className="font-semibold"
+              />
+              <InlineEdit
+                value={issuer.legalForm}
+                onChange={(v) => onUpdateIssuer({ legalForm: v })}
+                placeholder={PLACEHOLDERS.issuer.legalForm}
+                className="text-gray-600 text-xs"
+              />
+              <InlineEdit
+                value={issuer.phone}
+                onChange={(v) => onUpdateIssuer({ phone: v })}
+                placeholder={PLACEHOLDERS.issuer.phone}
+                className="text-gray-500 text-xs"
               />
               <InlineEdit
                 value={issuer.address}
