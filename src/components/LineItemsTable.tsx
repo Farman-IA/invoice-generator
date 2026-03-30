@@ -81,7 +81,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                       onValueChange={(v) => onUpdate(item.id, { vatRate: Number(v) as VatRate })}
                     >
                       <SelectTrigger className="pdf-vat-select h-auto border-none bg-transparent shadow-none text-sm px-0 py-0 w-full hover:bg-blue-50/60" style={{ justifyContent: 'center', gap: '4px' }}>
-                        <SelectValue className="flex-none text-center" />
+                        <SelectValue style={{ flex: 'none', textAlign: 'center' }} />
                       </SelectTrigger>
                       <SelectContent className="min-w-72">
                         {VAT_RATES.map((rate) => (
