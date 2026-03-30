@@ -95,7 +95,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                       </SelectContent>
                     </Select>
                   </div>
-                  <span className="pdf-vat-text hidden">{item.vatRate.toLocaleString('fr-FR')} %</span>
+                  <span className="pdf-vat-text hidden">{item.vatRate.toLocaleString('fr-FR')}</span>
                 </td>
                 <td className="py-2.5 px-2 text-right font-medium tabular-nums">
                   {formatEuro(lineTotal)} €

@@ -181,8 +181,10 @@ export async function generatePDF(
     el.style.display = 'none'
   })
   element.querySelectorAll<HTMLElement>('.pdf-vat-text').forEach((el) => {
+    el.classList.remove('hidden')
     el.style.display = 'block'
     el.style.textAlign = 'center'
+    el.style.width = '100%'
   })
 
   void element.offsetHeight
@@ -228,8 +230,10 @@ export async function generatePDF(
       el.style.display = ''
     })
     element.querySelectorAll<HTMLElement>('.pdf-vat-text').forEach((el) => {
+      el.classList.add('hidden')
       el.style.display = ''
       el.style.textAlign = ''
+      el.style.width = ''
     })
     element.classList.remove('pdf-capture')
   }
