@@ -108,7 +108,7 @@ export function InlineEdit({
       onClick={() => setIsEditing(true)}
       className={cn(
         baseClasses,
-        'cursor-text hover:bg-blue-50/60 inline-block min-w-[2rem] px-0.5',
+        'cursor-text hover:bg-blue-50/60 block min-w-[2rem] px-0.5',
         !displayValue && 'text-gray-400 italic',
       )}
     >
