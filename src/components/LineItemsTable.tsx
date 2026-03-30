@@ -73,7 +73,7 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                     <SelectTrigger className="h-auto border-none bg-transparent shadow-none text-sm px-1 py-0 justify-center w-full hover:bg-blue-50/60">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="min-w-72">
                       {VAT_RATES.map((rate) => (
                         <SelectItem key={rate.value} value={String(rate.value)}>
                           <span className="font-medium">{rate.label}</span>

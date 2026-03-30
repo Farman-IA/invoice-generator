@@ -68,7 +68,7 @@ function App() {
         />
       </div>
 
-      <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" duration={3000} />
     </div>
   )
 }

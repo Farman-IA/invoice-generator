@@ -1,6 +1,7 @@
 import { forwardRef, useRef } from 'react'
 import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { InlineEdit } from '@/components/InlineEdit'
 import { LineItemsTable } from '@/components/LineItemsTable'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
@@ -99,7 +100,12 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           <div className="space-y-1">
             <div
               onClick={() => logoInputRef.current?.click()}
-              className="w-36 h-20 mb-3 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors overflow-hidden"
+              className={cn(
+                "w-36 h-20 mb-3 rounded-lg flex items-center justify-center cursor-pointer transition-colors overflow-hidden",
+                issuer.logo
+                  ? "border-0 hover:opacity-80"
+                  : "border-2 border-dashed border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+              )}
             >
               {issuer.logo ? (
                 <img src={issuer.logo} alt="Logo" className="max-w-full max-h-full object-contain" />

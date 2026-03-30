@@ -69,7 +69,7 @@ export function createDefaultLineItem(): LineItem {
     description: '',
     quantity: 1,
     unitPrice: 0,
-    vatRate: 20,
+    vatRate: 10,
   }
 }
 
@@ -104,7 +104,7 @@ export const LEGAL_MENTIONS = {
 export const PLACEHOLDERS = {
   issuer: {
     companyName: 'Nom de votre société',
-    legalForm: 'SARL, SAS, EI, Micro-entreprise...',
+    legalForm: 'Statut (ex: SARL, SAS, EI)',
     address: 'Adresse du siège social',
     postalCode: 'Code postal',
     city: 'Ville',

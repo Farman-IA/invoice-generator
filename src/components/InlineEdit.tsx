@@ -55,6 +55,11 @@ export function InlineEdit({
   if (as === 'date' && value) {
     const parsed = new Date(value + 'T00:00:00')
     displayValue = isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('fr-FR')
+  } else if (as === 'number' && value) {
+    const num = Number(value)
+    if (!isNaN(num)) {
+      displayValue = num.toLocaleString('fr-FR')
+    }
   }
 
   const baseClasses = cn(
