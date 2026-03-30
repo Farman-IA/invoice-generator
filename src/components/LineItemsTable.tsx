@@ -75,12 +75,12 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                   />
                 </td>
                 <td className="py-2.5 px-2 text-center">
-                  <div className="w-full">
+                  <div className="pdf-vat-select">
                     <Select
                       value={String(item.vatRate)}
                       onValueChange={(v) => onUpdate(item.id, { vatRate: Number(v) as VatRate })}
                     >
-                      <SelectTrigger className="pdf-vat-select h-auto border-none bg-transparent shadow-none text-sm px-0 py-0 w-full hover:bg-blue-50/60 relative [&>svg]:absolute [&>svg]:right-0 [&>svg]:top-1/2 [&>svg]:-translate-y-1/2" style={{ justifyContent: 'center' }}>
+                      <SelectTrigger className="h-auto border-none bg-transparent shadow-none text-sm px-0 py-0 w-full hover:bg-blue-50/60 relative [&>svg]:absolute [&>svg]:right-0 [&>svg]:top-1/2 [&>svg]:-translate-y-1/2" style={{ justifyContent: 'center' }}>
                         <SelectValue style={{ flex: 'none', textAlign: 'center' }} />
                       </SelectTrigger>
                       <SelectContent className="min-w-72">
@@ -94,8 +94,8 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                         ))}
                       </SelectContent>
                     </Select>
-                    <span className="pdf-vat-text hidden text-sm w-full text-center block">{item.vatRate.toLocaleString('fr-FR')} %</span>
                   </div>
+                  <span className="pdf-vat-text hidden">{item.vatRate.toLocaleString('fr-FR')} %</span>
                 </td>
                 <td className="py-2.5 px-2 text-right font-medium tabular-nums">
                   {formatEuro(lineTotal)} €
