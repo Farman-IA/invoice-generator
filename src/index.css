@@ -189,6 +189,11 @@
   display: inline !important;
 }
 
+[data-vat-trigger] [data-slot="select-value"] {
+  flex: none !important;
+  text-align: center !important;
+}
+
 .pdf-capture .pdf-vat-select {
   display: none !important;
 }
