@@ -48,6 +48,7 @@ export interface InvoiceData {
   purchaseOrder: string
   paymentTerms: string
   notes: string
+  deposit: number
   items: LineItem[]
 }
 

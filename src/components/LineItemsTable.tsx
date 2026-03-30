@@ -67,24 +67,27 @@ export function LineItemsTable({ items, onAdd, onRemove, onUpdate }: LineItemsTa
                   />
                 </td>
                 <td className="py-2.5 px-1">
-                  <Select
-                    value={String(item.vatRate)}
-                    onValueChange={(v) => onUpdate(item.id, { vatRate: Number(v) as VatRate })}
-                  >
-                    <SelectTrigger className="h-auto border-none bg-transparent shadow-none text-sm px-1 py-0 justify-center w-full hover:bg-blue-50/60">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="min-w-72">
-                      {VAT_RATES.map((rate) => (
-                        <SelectItem key={rate.value} value={String(rate.value)}>
-                          <span className="font-medium">{rate.label}</span>
-                          <span className="text-xs text-muted-foreground ml-1 hidden sm:inline">
-                            — {rate.description}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Select
+                      value={String(item.vatRate)}
+                      onValueChange={(v) => onUpdate(item.id, { vatRate: Number(v) as VatRate })}
+                    >
+                      <SelectTrigger className="pdf-vat-select h-auto border-none bg-transparent shadow-none text-sm px-1 py-0 justify-center w-full hover:bg-blue-50/60">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="min-w-72">
+                        {VAT_RATES.map((rate) => (
+                          <SelectItem key={rate.value} value={String(rate.value)}>
+                            <span className="font-medium">{rate.label}</span>
+                            <span className="text-xs text-muted-foreground ml-1 hidden sm:inline">
+                              — {rate.description}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="pdf-vat-text hidden text-sm">{item.vatRate.toLocaleString('fr-FR')} %</span>
+                  </div>
                 </td>
                 <td className="py-2.5 pl-1 text-right font-medium tabular-nums">
                   {formatEuro(lineTotal)} €

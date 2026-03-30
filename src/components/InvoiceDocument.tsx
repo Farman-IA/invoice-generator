@@ -321,6 +321,37 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               <span>Total TTC</span>
               <span className="tabular-nums">{formatEuro(totals.totalTTC)} €</span>
             </div>
+
+            {/* Acompte */}
+            {invoice.deposit > 0 && (
+              <>
+                <div className="flex justify-between text-sm pt-1">
+                  <span className="text-gray-500">Acompte versé</span>
+                  <span className="tabular-nums">− {formatEuro(invoice.deposit)} €</span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-gray-800 text-base font-bold">
+                  <span>Reste à payer</span>
+                  <span className="tabular-nums">
+                    {formatEuro(Math.max(0, totals.totalTTC - invoice.deposit))} €
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Saisie acompte (mode édition uniquement, caché en PDF) */}
+        <div className="mt-4 flex justify-end no-print-pdf">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Acompte versé :</span>
+            <InlineEdit
+              value={invoice.deposit > 0 ? String(invoice.deposit) : ''}
+              onChange={(v) => onUpdateInvoice({ deposit: Math.max(0, Number(v) || 0) })}
+              as="number"
+              placeholder="0"
+              className="w-20 text-right text-sm"
+            />
+            <span>€</span>
           </div>
         </div>
 

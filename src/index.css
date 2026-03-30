@@ -172,10 +172,23 @@
   margin-top: 1.5rem !important;
 }
 
+.pdf-capture .no-print-pdf {
+  display: none !important;
+}
+
 .pdf-capture span.italic.text-gray-400 {
   display: none !important;
 }
 
 .pdf-capture tr[data-empty-line] {
+  display: none !important;
+}
+
+/* Mode capture PDF : afficher le texte TVA, cacher le Select */
+.pdf-capture .pdf-vat-text {
+  display: inline !important;
+}
+
+.pdf-capture .pdf-vat-select {
   display: none !important;
 }

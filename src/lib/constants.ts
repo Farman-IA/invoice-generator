@@ -86,6 +86,7 @@ export function getDefaultInvoice(counter: number): InvoiceData {
     purchaseOrder: '',
     paymentTerms: 'Virement bancaire à 30 jours',
     notes: '',
+    deposit: 0,
     items: [createDefaultLineItem()],
   }
 }
