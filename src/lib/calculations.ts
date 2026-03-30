@@ -44,7 +44,8 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
 
   vatBreakdown.sort((a, b) => a.rate - b.rate)
   totalVAT = Math.round(totalVAT * 100) / 100
-  const totalTTC = Math.round((totalHT + totalVAT) * 100) / 100
+  // Arrondi du TTC au décime supérieur (usage commercial français)
+  const totalTTC = Math.ceil((totalHT + totalVAT) * 10) / 10
 
   return { totalHT, vatBreakdown, totalTTC, totalVAT }
 }
