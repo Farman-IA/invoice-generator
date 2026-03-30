@@ -1,4 +1,4 @@
-import { toCanvas } from 'html-to-image'
+import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 
 function sanitizeFilename(str: string): string {
@@ -9,26 +9,159 @@ function sanitizeFilename(str: string): string {
     .trim()
 }
 
+// --- Conversion oklch → rgb ---
+
+const OKLCH_RE = /oklch\([^)]+\)/g
+
+function oklchToRgb(oklchStr: string): string {
+  const match = oklchStr.match(
+    /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/
+  )
+  if (!match) return oklchStr
+
+  const L = parseFloat(match[1])
+  const C = parseFloat(match[2])
+  const H = parseFloat(match[3])
+  let alpha = 1
+  if (match[4]) {
+    alpha = match[4].endsWith('%')
+      ? parseFloat(match[4]) / 100
+      : parseFloat(match[4])
+  }
+
+  const hRad = (H * Math.PI) / 180
+  const a = C * Math.cos(hRad)
+  const b = C * Math.sin(hRad)
+
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b
+
+  const l = l_ * l_ * l_
+  const m = m_ * m_ * m_
+  const s = s_ * s_ * s_
+
+  const rLin = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
+  const gLin = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
+  const bLin = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+
+  function gamma(c: number): number {
+    const abs = Math.abs(c)
+    if (abs <= 0.0031308) return 12.92 * c
+    return (c < 0 ? -1 : 1) * (1.055 * Math.pow(abs, 1 / 2.4) - 0.055)
+  }
+
+  const r = Math.round(Math.max(0, Math.min(255, gamma(rLin) * 255)))
+  const g = Math.round(Math.max(0, Math.min(255, gamma(gLin) * 255)))
+  const bv = Math.round(Math.max(0, Math.min(255, gamma(bLin) * 255)))
+
+  return alpha < 1
+    ? `rgba(${r}, ${g}, ${bv}, ${alpha})`
+    : `rgb(${r}, ${g}, ${bv})`
+}
+
+// --- Patch oklch inline styles ---
+
+const COLOR_PROPS = [
+  'color',
+  'background-color',
+  'border-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'outline-color',
+  'text-decoration-color',
+  'box-shadow',
+]
+
 /**
- * Prépare l'élément pour la capture PDF :
- * - Force la largeur à 210mm (A4)
- * - Ajoute la classe .pdf-capture qui cache les éléments interactifs
- * Retourne une fonction pour tout restaurer.
+ * Convertit toutes les couleurs oklch en rgb via inline styles
+ * pour que html2canvas puisse les lire correctement.
  */
-function prepareForPdf(element: HTMLElement): () => void {
-  const prevWidth = element.style.width
-  const prevMaxWidth = element.style.maxWidth
+function patchOklchColors(root: HTMLElement): () => void {
+  const restores: (() => void)[] = []
+  const htmlEl = document.documentElement
 
-  element.style.width = '210mm'
-  element.style.maxWidth = '210mm'
-  element.classList.add('pdf-capture')
+  // 1. Patcher les variables CSS sur :root
+  for (const sheet of document.styleSheets) {
+    try {
+      for (const rule of sheet.cssRules) {
+        if (!(rule instanceof CSSStyleRule)) {
+          if ('cssRules' in rule) {
+            // Gérer les règles imbriquées (@layer, @media, etc.)
+            for (const nested of (rule as CSSGroupingRule).cssRules) {
+              if (nested instanceof CSSStyleRule) {
+                patchCssVarsFromRule(nested, htmlEl, restores)
+              }
+            }
+          }
+          continue
+        }
+        patchCssVarsFromRule(rule, htmlEl, restores)
+      }
+    } catch {
+      // Ignorer les stylesheets CORS
+    }
+  }
 
-  return () => {
-    element.style.width = prevWidth
-    element.style.maxWidth = prevMaxWidth
-    element.classList.remove('pdf-capture')
+  // Forcer le recalcul des styles
+  void htmlEl.offsetHeight
+
+  // 2. Patcher les propriétés de couleur sur chaque élément
+  const elements = root.querySelectorAll('*')
+  patchElementColors(root, restores)
+  elements.forEach((el) => {
+    if (el instanceof HTMLElement) {
+      patchElementColors(el, restores)
+    }
+  })
+
+  return () => restores.forEach((fn) => fn())
+}
+
+function patchCssVarsFromRule(
+  rule: CSSStyleRule,
+  htmlEl: HTMLElement,
+  restores: (() => void)[]
+) {
+  for (let i = 0; i < rule.style.length; i++) {
+    const prop = rule.style[i]
+    if (!prop.startsWith('--')) continue
+
+    const value = rule.style.getPropertyValue(prop).trim()
+    if (!value.includes('oklch')) continue
+
+    const rgb = value.replace(OKLCH_RE, oklchToRgb)
+    const prev = htmlEl.style.getPropertyValue(prop)
+    htmlEl.style.setProperty(prop, rgb)
+    restores.push(() => {
+      if (prev) htmlEl.style.setProperty(prop, prev)
+      else htmlEl.style.removeProperty(prop)
+    })
   }
 }
+
+function patchElementColors(
+  el: HTMLElement,
+  restores: (() => void)[]
+) {
+  const computed = getComputedStyle(el)
+  for (const prop of COLOR_PROPS) {
+    const value = computed.getPropertyValue(prop)
+    if (!value.includes('oklch')) continue
+
+    const rgb = value.replace(OKLCH_RE, oklchToRgb)
+    const prev = el.style.getPropertyValue(prop)
+    el.style.setProperty(prop, rgb)
+    restores.push(() => {
+      if (prev) el.style.setProperty(prop, prev)
+      else el.style.removeProperty(prop)
+    })
+  }
+}
+
+// --- Génération PDF ---
 
 export async function generatePDF(
   element: HTMLElement,
@@ -40,14 +173,18 @@ export async function generatePDF(
   const cleanNumber = sanitizeFilename(invoiceNumber) || 'Facture'
   const filename = `Facture_${cleanNumber}_${cleanClient}_${date}.pdf`
 
-  const restore = prepareForPdf(element)
+  // Préparer l'élément : cacher les boutons/chevrons
+  element.classList.add('pdf-capture')
+  void element.offsetHeight
+
+  // Convertir oklch → rgb pour html2canvas
+  const restoreColors = patchOklchColors(element)
 
   try {
-    // html-to-image utilise le moteur de rendu natif du navigateur
-    // qui supporte oklch et toutes les fonctionnalités CSS modernes
-    const canvas = await toCanvas(element, {
-      pixelRatio: 2,
-      cacheBust: true,
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
     })
 
     const pdf = new jsPDF({
@@ -59,7 +196,6 @@ export async function generatePDF(
     const pageWidth = 210
     const pageHeight = 297
 
-    // Pas de marge PDF : l'élément a déjà son propre padding (p-12)
     const imgWidthPx = canvas.width / 2
     const imgHeightPx = canvas.height / 2
     const scale = pageWidth / imgWidthPx
@@ -69,7 +205,6 @@ export async function generatePDF(
       const imgData = canvas.toDataURL('image/jpeg', 0.98)
       pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, scaledHeight)
     } else {
-      // Plusieurs pages : découper le canvas en tranches
       const pxPerPage = (pageHeight / scale) * 2
       const totalPages = Math.ceil(canvas.height / pxPerPage)
 
@@ -97,6 +232,7 @@ export async function generatePDF(
 
     pdf.save(filename)
   } finally {
-    restore()
+    restoreColors()
+    element.classList.remove('pdf-capture')
   }
 }

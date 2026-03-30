@@ -164,7 +164,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                   placeholder="Ville"
                   className="text-gray-500"
                 />
-                <span className="text-gray-400">, le</span>
+                <span className="text-gray-400">{issuer.city ? ', le' : 'Le'}</span>
                 <InlineEdit
                   value={invoice.issueDate}
                   onChange={(v) => onUpdateInvoice({ issueDate: v })}
