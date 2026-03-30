@@ -175,6 +175,16 @@ export async function generatePDF(
 
   // Préparer l'élément : cacher les boutons/chevrons
   element.classList.add('pdf-capture')
+
+  // Forcer l'affichage centré des taux TVA (inline > toute CSS)
+  element.querySelectorAll<HTMLElement>('.pdf-vat-select').forEach((el) => {
+    el.style.display = 'none'
+  })
+  element.querySelectorAll<HTMLElement>('.pdf-vat-text').forEach((el) => {
+    el.style.display = 'block'
+    el.style.textAlign = 'center'
+  })
+
   void element.offsetHeight
 
   // Convertir oklch → rgb pour html2canvas
@@ -214,6 +224,13 @@ export async function generatePDF(
     pdf.save(filename)
   } finally {
     restoreColors()
+    element.querySelectorAll<HTMLElement>('.pdf-vat-select').forEach((el) => {
+      el.style.display = ''
+    })
+    element.querySelectorAll<HTMLElement>('.pdf-vat-text').forEach((el) => {
+      el.style.display = ''
+      el.style.textAlign = ''
+    })
     element.classList.remove('pdf-capture')
   }
 }
