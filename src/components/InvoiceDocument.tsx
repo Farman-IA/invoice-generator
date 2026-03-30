@@ -162,6 +162,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Émetteur
             </h2>
+            {/* Identité */}
             <div className="space-y-0.5">
               <InlineEdit
                 value={issuer.companyName}
@@ -173,14 +174,11 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 value={issuer.legalForm}
                 onChange={(v) => onUpdateIssuer({ legalForm: v })}
                 placeholder={PLACEHOLDERS.issuer.legalForm}
-                className="text-gray-600 text-xs"
-              />
-              <InlineEdit
-                value={issuer.phone}
-                onChange={(v) => onUpdateIssuer({ phone: v })}
-                placeholder={PLACEHOLDERS.issuer.phone}
                 className="text-gray-500 text-xs"
               />
+            </div>
+            {/* Coordonnées */}
+            <div className="mt-1.5 space-y-0.5">
               <InlineEdit
                 value={issuer.address}
                 onChange={(v) => onUpdateIssuer({ address: v })}
@@ -199,11 +197,17 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                   placeholder={PLACEHOLDERS.issuer.city}
                 />
               </div>
-              <div className="mt-2 space-y-0.5 text-xs text-gray-600">
+              <LabeledField label="Tél" value={issuer.phone} onChange={(v) => onUpdateIssuer({ phone: v })} placeholder={PLACEHOLDERS.issuer.phone} />
+            </div>
+            {/* Infos légales */}
+            <div className="mt-2 space-y-0.5 text-xs text-gray-600">
+              <div className="flex gap-4">
                 <LabeledField label="SIRET" value={issuer.siret} onChange={(v) => onUpdateIssuer({ siret: v })} placeholder={PLACEHOLDERS.issuer.siret} />
-                <LabeledField label="SIREN" value={issuer.siren} onChange={(v) => onUpdateIssuer({ siren: v })} placeholder={PLACEHOLDERS.issuer.siren} />
-                <LabeledField label="APE/NAF" value={issuer.apeNaf} onChange={(v) => onUpdateIssuer({ apeNaf: v })} placeholder={PLACEHOLDERS.issuer.apeNaf} />
-                <LabeledField label="TVA" value={issuer.tvaNumber} onChange={(v) => onUpdateIssuer({ tvaNumber: v })} placeholder={PLACEHOLDERS.issuer.tvaNumber} />
+                <LabeledField label="APE" value={issuer.apeNaf} onChange={(v) => onUpdateIssuer({ apeNaf: v })} placeholder={PLACEHOLDERS.issuer.apeNaf} />
+              </div>
+              <LabeledField label="SIREN" value={issuer.siren} onChange={(v) => onUpdateIssuer({ siren: v })} placeholder={PLACEHOLDERS.issuer.siren} />
+              <LabeledField label="TVA" value={issuer.tvaNumber} onChange={(v) => onUpdateIssuer({ tvaNumber: v })} placeholder={PLACEHOLDERS.issuer.tvaNumber} />
+              <div className="flex gap-4">
                 <LabeledField label="Capital" value={issuer.shareCapital} onChange={(v) => onUpdateIssuer({ shareCapital: v })} placeholder={PLACEHOLDERS.issuer.shareCapital} />
                 <LabeledField label="RCS" value={issuer.rcsCity} onChange={(v) => onUpdateIssuer({ rcsCity: v })} placeholder={PLACEHOLDERS.issuer.rcsCity} />
               </div>
