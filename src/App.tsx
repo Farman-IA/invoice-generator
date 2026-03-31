@@ -41,29 +41,44 @@ function App() {
   }
 
   const handleFinalize = async () => {
+    // Capturer les valeurs avant l'async (elles ne changent pas pendant la finalisation)
+    const invoiceNumber = state.invoice.number
+    const clientName = state.client.companyName
+
     const ok = await finalizeInvoice()
-    if (ok && invoiceRef.current) {
-      // Petit délai pour laisser le state se mettre à jour
-      setTimeout(() => {
-        handleDownloadPDF()
-      }, 100)
+    if (ok) {
+      // Double rAF pour attendre que le DOM reflète l'état finalisé
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (invoiceRef.current) {
+            generatePDF(invoiceRef.current, invoiceNumber, clientName)
+          }
+        })
+      })
     }
   }
 
-  // Télécharger une facture depuis la galerie : la charger, puis générer le PDF
+  // Télécharger une facture depuis la galerie
   const handleGalleryDownload = (id: string) => {
+    // Lire les données directement depuis la collection (pas de closure stale)
+    const invoice = savedInvoices.find(inv => inv.id === id)
+    if (!invoice) return
+
+    const invoiceNumber = invoice.invoice.number
+    const clientName = invoice.client.companyName
+
+    // Charger dans le formulaire pour le rendu DOM
     loadInvoice(id)
-    // Attendre que le DOM se mette à jour avec les nouvelles données
-    setTimeout(async () => {
-      if (invoiceRef.current) {
-        await generatePDF(
-          invoiceRef.current,
-          state.invoice.number,
-          state.client.companyName
-        )
-        setView('GALLERY')
-      }
-    }, 300)
+
+    // Double rAF pour attendre que le DOM soit mis à jour
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        if (invoiceRef.current) {
+          await generatePDF(invoiceRef.current, invoiceNumber, clientName)
+          setView('GALLERY')
+        }
+      })
+    })
   }
 
   if (isLoading) {
@@ -81,7 +96,6 @@ function App() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-sm font-semibold text-gray-600">Générateur de factures</h1>
           <div className="flex gap-2">
-            {/* Navigation */}
             <Button
               variant={view === 'EDIT' ? 'default' : 'outline'}
               size="sm"

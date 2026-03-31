@@ -1,4 +1,4 @@
-import type { SavedInvoice } from '@/types/invoice'
+import type { SavedInvoice, IssuerProfile } from '@/types/invoice'
 
 const KEYS = {
   INVOICES: 'invoices',
@@ -43,16 +43,16 @@ export const storage = {
     }
   },
 
-  async getIssuerProfile<T>(): Promise<T | null> {
+  async getIssuerProfile(): Promise<IssuerProfile | null> {
     try {
       const result = await window.storage.get(KEYS.ISSUER_PROFILE)
-      return result ? JSON.parse(result.value) as T : null
+      return result ? JSON.parse(result.value) as IssuerProfile : null
     } catch {
       return null
     }
   },
 
-  async saveIssuerProfile(issuer: unknown): Promise<boolean> {
+  async saveIssuerProfile(issuer: IssuerProfile): Promise<boolean> {
     try {
       await window.storage.set(KEYS.ISSUER_PROFILE, JSON.stringify(issuer))
       return true

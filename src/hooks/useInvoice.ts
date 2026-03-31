@@ -31,10 +31,15 @@ export function useInvoice() {
   const [isFinalized, setIsFinalized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Refs pour éviter les closures stale
   const stateRef = useRef(state)
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
+  useEffect(() => { stateRef.current = state }, [state])
+
+  const savedInvoicesRef = useRef(savedInvoices)
+  useEffect(() => { savedInvoicesRef.current = savedInvoices }, [savedInvoices])
+
+  const currentInvoiceIdRef = useRef(currentInvoiceId)
+  useEffect(() => { currentInvoiceIdRef.current = currentInvoiceId }, [currentInvoiceId])
 
   // Charger les données depuis window.storage au montage
   useEffect(() => {
@@ -43,10 +48,11 @@ export function useInvoice() {
         const [invoices, counter, issuer] = await Promise.all([
           storage.getInvoices(),
           storage.getCounter(),
-          storage.getIssuerProfile<IssuerProfile>(),
+          storage.getIssuerProfile(),
         ])
 
         setSavedInvoices(invoices)
+        savedInvoicesRef.current = invoices
 
         setState(prev => ({
           ...prev,
@@ -128,100 +134,72 @@ export function useInvoice() {
     }))
   }, [])
 
-  // Sauvegarder la facture courante dans la collection
-  const saveInvoice = useCallback(async () => {
+  // Helper : upsert une facture dans la collection et persister
+  const upsertAndPersist = useCallback(async (status: 'brouillon' | 'finalisée'): Promise<string> => {
     const now = new Date().toISOString()
     const current = stateRef.current
+    const invoiceId = currentInvoiceIdRef.current
 
-    setSavedInvoices(prev => {
-      let updated: SavedInvoice[]
+    let updated: SavedInvoice[]
+    let resultId: string
 
-      if (currentInvoiceId) {
-        // Mise à jour d'une facture existante
-        updated = prev.map(inv =>
-          inv.id === currentInvoiceId
-            ? {
-                ...inv,
-                issuer: current.issuer,
-                client: current.client,
-                invoice: current.invoice,
-                updatedAt: now,
-              }
-            : inv
-        )
-      } else {
-        // Nouvelle facture
-        const newId = crypto.randomUUID()
-        const newInvoice: SavedInvoice = {
-          id: newId,
-          issuer: current.issuer,
-          client: current.client,
-          invoice: current.invoice,
-          status: 'brouillon',
-          createdAt: now,
-          updatedAt: now,
-        }
-        updated = [newInvoice, ...prev]
-        setCurrentInvoiceId(newId)
-      }
-
-      // Persister immédiatement
-      storage.saveInvoices(updated)
-      storage.saveCounter(current.counter)
-      return updated
-    })
-
-    toast.success('Facture sauvegardée')
-  }, [currentInvoiceId])
-
-  // Finaliser la facture : statut → finalisée, sauvegarder, retourner true pour déclencher le PDF
-  const finalizeInvoice = useCallback(async (): Promise<boolean> => {
-    const now = new Date().toISOString()
-    const current = stateRef.current
-
-    let invoiceId = currentInvoiceId
-
-    const updated = savedInvoices.map(inv => {
-      if (inv.id === invoiceId) {
-        return {
-          ...inv,
-          issuer: current.issuer,
-          client: current.client,
-          invoice: current.invoice,
-          status: 'finalisée' as const,
-          updatedAt: now,
-        }
-      }
-      return inv
-    })
-
-    // Si la facture n'existe pas encore dans la collection, la créer
-    if (!invoiceId) {
-      invoiceId = crypto.randomUUID()
+    if (invoiceId) {
+      updated = savedInvoicesRef.current.map(inv =>
+        inv.id === invoiceId
+          ? {
+              ...inv,
+              issuer: current.issuer,
+              client: current.client,
+              invoice: current.invoice,
+              status,
+              updatedAt: now,
+            }
+          : inv
+      )
+      resultId = invoiceId
+    } else {
+      resultId = crypto.randomUUID()
       const newInvoice: SavedInvoice = {
-        id: invoiceId,
+        id: resultId,
         issuer: current.issuer,
         client: current.client,
         invoice: current.invoice,
-        status: 'finalisée',
+        status,
         createdAt: now,
         updatedAt: now,
       }
-      updated.unshift(newInvoice)
-      setCurrentInvoiceId(invoiceId)
+      updated = [newInvoice, ...savedInvoicesRef.current]
+      setCurrentInvoiceId(resultId)
+      currentInvoiceIdRef.current = resultId
     }
 
     setSavedInvoices(updated)
-    setIsFinalized(true)
-    await storage.saveInvoices(updated)
+    savedInvoicesRef.current = updated
+
+    const ok = await storage.saveInvoices(updated)
     await storage.saveCounter(current.counter)
+    if (!ok) toast.error('Erreur de sauvegarde')
+
+    return resultId
+  }, [])
+
+  // Sauvegarder la facture courante dans la collection
+  const saveInvoice = useCallback(async () => {
+    await upsertAndPersist('brouillon')
+    toast.success('Facture sauvegardée')
+  }, [upsertAndPersist])
+
+  // Finaliser la facture : statut → finalisée, sauvegarder
+  const finalizeInvoice = useCallback(async (): Promise<boolean> => {
+    await upsertAndPersist('finalisée')
+    setIsFinalized(true)
     toast.success('Facture finalisée')
     return true
-  }, [currentInvoiceId, savedInvoices])
+  }, [upsertAndPersist])
 
   // Charger une facture depuis la collection dans le formulaire
   const loadInvoice = useCallback((id: string) => {
-    const invoice = savedInvoices.find(inv => inv.id === id)
+    const invoice = savedInvoicesRef.current.find(inv => inv.id === id)
     if (!invoice) return
 
     setState(prev => ({
@@ -231,13 +209,14 @@ export function useInvoice() {
       invoice: invoice.invoice,
     }))
     setCurrentInvoiceId(id)
+    currentInvoiceIdRef.current = id
     setIsFinalized(invoice.status === 'finalisée')
     setView('EDIT')
-  }, [savedInvoices])
+  }, [])
 
   // Dupliquer une facture
   const duplicateInvoice = useCallback(async (id: string) => {
-    const original = savedInvoices.find(inv => inv.id === id)
+    const original = savedInvoicesRef.current.find(inv => inv.id === id)
     if (!original) return
 
     const now = new Date().toISOString()
@@ -264,13 +243,10 @@ export function useInvoice() {
       updatedAt: now,
     }
 
-    const updated = [duplicated, ...savedInvoices]
+    const updated = [duplicated, ...savedInvoicesRef.current]
     setSavedInvoices(updated)
-    setState(prev => ({ ...prev, counter: newCounter }))
-    await storage.saveInvoices(updated)
-    await storage.saveCounter(newCounter)
+    savedInvoicesRef.current = updated
 
-    // Charger la copie dans le formulaire
     setState(prev => ({
       ...prev,
       issuer: duplicated.issuer,
@@ -279,40 +255,47 @@ export function useInvoice() {
       counter: newCounter,
     }))
     setCurrentInvoiceId(duplicated.id)
+    currentInvoiceIdRef.current = duplicated.id
     setIsFinalized(false)
     setView('EDIT')
+
+    await storage.saveInvoices(updated)
+    await storage.saveCounter(newCounter)
     toast.success('Facture dupliquée')
-  }, [savedInvoices])
+  }, [])
 
   // Supprimer une facture
   const deleteInvoice = useCallback(async (id: string) => {
-    const updated = savedInvoices.filter(inv => inv.id !== id)
+    const updated = savedInvoicesRef.current.filter(inv => inv.id !== id)
     setSavedInvoices(updated)
+    savedInvoicesRef.current = updated
+
     await storage.saveInvoices(updated)
 
-    // Si c'est la facture en cours d'édition, réinitialiser
-    if (id === currentInvoiceId) {
+    if (id === currentInvoiceIdRef.current) {
       setCurrentInvoiceId(null)
+      currentInvoiceIdRef.current = null
       setIsFinalized(false)
     }
 
     toast.success('Facture supprimée')
-  }, [savedInvoices, currentInvoiceId])
+  }, [])
 
   // Créer une nouvelle facture vierge
-  const newInvoice = useCallback(() => {
-    setState(prev => {
-      const newCounter = prev.counter + 1
-      return {
-        ...prev,
-        client: getDefaultClient(),
-        invoice: getDefaultInvoice(newCounter),
-        counter: newCounter,
-      }
-    })
+  const newInvoice = useCallback(async () => {
+    const newCounter = stateRef.current.counter + 1
+    setState(prev => ({
+      ...prev,
+      client: getDefaultClient(),
+      invoice: getDefaultInvoice(newCounter),
+      counter: newCounter,
+    }))
     setCurrentInvoiceId(null)
+    currentInvoiceIdRef.current = null
     setIsFinalized(false)
     setView('EDIT')
+
+    await storage.saveCounter(newCounter)
     toast.success('Nouvelle facture créée')
   }, [])
 
