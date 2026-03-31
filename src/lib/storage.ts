@@ -1,48 +1,42 @@
-import type { SavedInvoice, IssuerProfile } from '@/types/invoice'
+import type { SavedInvoice, IssuerProfile, ClientRecord, ArticleTemplate } from '@/types/invoice'
 
 const KEYS = {
   INVOICES: 'invoices',
   INVOICE_COUNTER: 'invoice-counter',
   ISSUER_PROFILE: 'issuer-profile',
+  CLIENTS: 'clients',
+  ARTICLE_TEMPLATES: 'articleTemplates',
+  THEME: 'theme',
 } as const
 
+async function get<T>(key: string, fallback: T): Promise<T> {
+  try {
+    const result = await window.storage.get(key)
+    return result ? JSON.parse(result.value) as T : fallback
+  } catch {
+    return fallback
+  }
+}
+
+async function set(key: string, value: unknown): Promise<boolean> {
+  try {
+    await window.storage.set(key, JSON.stringify(value))
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const storage = {
-  async getInvoices(): Promise<SavedInvoice[]> {
-    try {
-      const result = await window.storage.get(KEYS.INVOICES)
-      return result ? JSON.parse(result.value) : []
-    } catch {
-      return []
-    }
-  },
+  // Factures
+  getInvoices: () => get<SavedInvoice[]>(KEYS.INVOICES, []),
+  saveInvoices: (invoices: SavedInvoice[]) => set(KEYS.INVOICES, invoices),
 
-  async saveInvoices(invoices: SavedInvoice[]): Promise<boolean> {
-    try {
-      await window.storage.set(KEYS.INVOICES, JSON.stringify(invoices))
-      return true
-    } catch {
-      return false
-    }
-  },
+  // Compteur
+  getCounter: () => get<number>(KEYS.INVOICE_COUNTER, 1),
+  saveCounter: (counter: number) => set(KEYS.INVOICE_COUNTER, counter),
 
-  async getCounter(): Promise<number> {
-    try {
-      const result = await window.storage.get(KEYS.INVOICE_COUNTER)
-      return result ? JSON.parse(result.value) : 1
-    } catch {
-      return 1
-    }
-  },
-
-  async saveCounter(counter: number): Promise<boolean> {
-    try {
-      await window.storage.set(KEYS.INVOICE_COUNTER, JSON.stringify(counter))
-      return true
-    } catch {
-      return false
-    }
-  },
-
+  // Profil émetteur
   async getIssuerProfile(): Promise<IssuerProfile | null> {
     try {
       const result = await window.storage.get(KEYS.ISSUER_PROFILE)
@@ -51,13 +45,17 @@ export const storage = {
       return null
     }
   },
+  saveIssuerProfile: (issuer: IssuerProfile) => set(KEYS.ISSUER_PROFILE, issuer),
 
-  async saveIssuerProfile(issuer: IssuerProfile): Promise<boolean> {
-    try {
-      await window.storage.set(KEYS.ISSUER_PROFILE, JSON.stringify(issuer))
-      return true
-    } catch {
-      return false
-    }
-  },
+  // Carnet de clients
+  getClients: () => get<ClientRecord[]>(KEYS.CLIENTS, []),
+  saveClients: (clients: ClientRecord[]) => set(KEYS.CLIENTS, clients),
+
+  // Modèles d'articles
+  getArticleTemplates: () => get<ArticleTemplate[]>(KEYS.ARTICLE_TEMPLATES, []),
+  saveArticleTemplates: (templates: ArticleTemplate[]) => set(KEYS.ARTICLE_TEMPLATES, templates),
+
+  // Thème
+  getTheme: () => get<'light' | 'dark'>(KEYS.THEME, 'light'),
+  saveTheme: (theme: 'light' | 'dark') => set(KEYS.THEME, theme),
 }

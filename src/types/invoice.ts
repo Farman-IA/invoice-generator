@@ -67,8 +67,30 @@ export interface SavedInvoice {
   client: ClientInfo
   invoice: InvoiceData
   status: InvoiceStatus
+  paymentStatus?: PaymentStatus
   createdAt: string
   updatedAt: string
 }
 
 export type AppView = 'EDIT' | 'GALLERY'
+
+export type PaymentStatus = 'en_attente' | 'payee' | 'en_retard'
+
+export interface ClientRecord {
+  id: string
+  companyName: string
+  contactName: string
+  address: string
+  postalCode: string
+  city: string
+  siren: string
+  tvaNumber: string
+  codeService: string
+}
+
+export interface ArticleTemplate {
+  id: string
+  description: string
+  unitPrice: number
+  vatRate: VatRate
+}

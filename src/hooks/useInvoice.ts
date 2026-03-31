@@ -51,8 +51,19 @@ export function useInvoice() {
           storage.getIssuerProfile(),
         ])
 
-        setSavedInvoices(invoices)
-        savedInvoicesRef.current = invoices
+        // Calcul auto du statut en_retard
+        const today = new Date().toISOString().split('T')[0]
+        const withLateStatus = invoices.map(inv => {
+          if (inv.status === 'finalisée' && inv.paymentStatus === 'en_attente' && inv.invoice.dueDate < today) {
+            return { ...inv, paymentStatus: 'en_retard' as const }
+          }
+          return inv
+        })
+        const hasLateUpdates = withLateStatus.some((inv, i) => inv.paymentStatus !== invoices[i].paymentStatus)
+        if (hasLateUpdates) storage.saveInvoices(withLateStatus)
+
+        setSavedInvoices(withLateStatus)
+        savedInvoicesRef.current = withLateStatus
 
         setState(prev => ({
           ...prev,
@@ -152,6 +163,7 @@ export function useInvoice() {
               client: current.client,
               invoice: current.invoice,
               status,
+              ...(status === 'finalisée' && !inv.paymentStatus ? { paymentStatus: 'en_attente' as const } : {}),
               updatedAt: now,
             }
           : inv
@@ -165,6 +177,7 @@ export function useInvoice() {
         client: current.client,
         invoice: current.invoice,
         status,
+        ...(status === 'finalisée' ? { paymentStatus: 'en_attente' as const } : {}),
         createdAt: now,
         updatedAt: now,
       }
@@ -281,6 +294,17 @@ export function useInvoice() {
     toast.success('Facture supprimée')
   }, [])
 
+  // Marquer une facture comme payée
+  const markAsPaid = useCallback(async (id: string) => {
+    const updated = savedInvoicesRef.current.map(inv =>
+      inv.id === id ? { ...inv, paymentStatus: 'payee' as const, updatedAt: new Date().toISOString() } : inv
+    )
+    setSavedInvoices(updated)
+    savedInvoicesRef.current = updated
+    await storage.saveInvoices(updated)
+    toast.success('Facture marquée comme payée')
+  }, [])
+
   // Créer une nouvelle facture vierge
   const newInvoice = useCallback(async () => {
     const newCounter = stateRef.current.counter + 1
@@ -318,6 +342,7 @@ export function useInvoice() {
     loadInvoice,
     duplicateInvoice,
     deleteInvoice,
+    markAsPaid,
     newInvoice,
   }
 }

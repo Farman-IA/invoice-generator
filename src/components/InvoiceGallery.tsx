@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Edit, Copy, Trash2, Download, FileText } from 'lucide-react'
+import { Edit, Copy, Trash2, Download, FileText, CheckCircle, Search, X, ArrowUpDown, SlidersHorizontal, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -11,8 +11,12 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
-import type { SavedInvoice } from '@/types/invoice'
+import type { SavedInvoice, PaymentStatus } from '@/types/invoice'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
+
+type StatusFilter = 'tous' | 'brouillon' | 'finalisée'
+type PaymentFilter = 'tous' | 'en_attente' | 'payee' | 'en_retard'
+type SortKey = 'date' | 'date_asc' | 'montant' | 'montant_asc' | 'client'
 
 interface InvoiceGalleryProps {
   invoices: SavedInvoice[]
@@ -20,124 +24,235 @@ interface InvoiceGalleryProps {
   onDuplicate: (id: string) => void
   onDelete: (id: string) => void
   onDownload: (id: string) => void
+  onMarkPaid: (id: string) => void
+}
+
+const PAYMENT_BADGE: Record<PaymentStatus, { label: string; className: string }> = {
+  en_attente: { label: 'En attente', className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' },
+  payee: { label: 'Payée', className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' },
+  en_retard: { label: 'En retard', className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 animate-pulse' },
 }
 
 export function InvoiceGallery({
-  invoices,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  onDownload,
+  invoices, onEdit, onDuplicate, onDelete, onDownload, onMarkPaid,
 }: InvoiceGalleryProps) {
   const [deleteTarget, setDeleteTarget] = useState<SavedInvoice | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('tous')
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('tous')
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [showFilters, setShowFilters] = useState(false)
 
-  const sorted = [...invoices].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  )
+  // Filtrage
+  let filtered = invoices
 
-  if (sorted.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-        <FileText className="size-16 mb-4 stroke-1" />
-        <p className="text-lg font-medium text-gray-500">Aucune facture sauvegardée</p>
-        <p className="text-sm mt-1">Créez votre première !</p>
-      </div>
+  if (search) {
+    const q = search.toLowerCase()
+    filtered = filtered.filter(inv =>
+      inv.invoice.number.toLowerCase().includes(q) ||
+      inv.client.companyName.toLowerCase().includes(q) ||
+      formatEuro(calculateTotals(inv.invoice.items).totalTTC).includes(q)
     )
   }
 
+  if (statusFilter !== 'tous') {
+    filtered = filtered.filter(inv => inv.status === statusFilter)
+  }
+
+  if (paymentFilter !== 'tous') {
+    filtered = filtered.filter(inv => inv.paymentStatus === paymentFilter)
+  }
+
+  // Tri
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sortKey) {
+      case 'date': return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      case 'date_asc': return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+      case 'montant': return calculateTotals(b.invoice.items).totalTTC - calculateTotals(a.invoice.items).totalTTC
+      case 'montant_asc': return calculateTotals(a.invoice.items).totalTTC - calculateTotals(b.invoice.items).totalTTC
+      case 'client': return a.client.companyName.localeCompare(b.client.companyName)
+      default: return 0
+    }
+  })
+
+  const hasFilters = statusFilter !== 'tous' || paymentFilter !== 'tous' || search !== ''
+
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sorted.map(invoice => {
-          const totals = calculateTotals(invoice.invoice.items)
-          const date = new Date(invoice.invoice.issueDate).toLocaleDateString('fr-FR')
-          const isBrouillon = invoice.status === 'brouillon'
+      {/* Barre de recherche + filtres */}
+      <div className="mb-6 space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher par numéro, client, montant..."
+              className="w-full pl-10 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className={showFilters ? 'bg-gray-100 dark:bg-gray-800' : ''}>
+            <SlidersHorizontal className="size-4 mr-1" />
+            Filtres
+          </Button>
+          <div className="relative">
+            <Button variant="outline" size="sm" onClick={() => {
+              const keys: SortKey[] = ['date', 'date_asc', 'montant', 'montant_asc', 'client']
+              const idx = keys.indexOf(sortKey)
+              setSortKey(keys[(idx + 1) % keys.length])
+            }}>
+              <ArrowUpDown className="size-4 mr-1" />
+              {sortKey === 'date' ? 'Récent' : sortKey === 'date_asc' ? 'Ancien' : sortKey === 'montant' ? '€ ↓' : sortKey === 'montant_asc' ? '€ ↑' : 'A-Z'}
+            </Button>
+          </div>
+        </div>
 
-          return (
-            <div
-              key={invoice.id}
-              className="group bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col gap-3"
-            >
-              {/* En-tête carte */}
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm text-gray-900 truncate">
-                    {invoice.invoice.number}
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    {invoice.client.companyName || 'Client non renseigné'}
-                  </p>
-                </div>
-                <Badge
-                  variant={isBrouillon ? 'secondary' : 'default'}
-                  className={
-                    isBrouillon
-                      ? 'bg-amber-100 text-amber-700 border-amber-200'
-                      : 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                  }
-                >
-                  {invoice.status}
-                </Badge>
-              </div>
-
-              {/* Montant + date */}
-              <div className="flex items-baseline justify-between">
-                <span className="text-lg font-bold text-gray-900">
-                  {formatEuro(totals.totalTTC)} €
-                </span>
-                <span className="text-xs text-gray-400">{date}</span>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-1 pt-1 border-t border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                {isBrouillon && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => onEdit(invoice.id)}
-                    title="Éditer"
-                  >
-                    <Edit className="size-3.5" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => onDuplicate(invoice.id)}
-                  title="Dupliquer"
-                >
-                  <Copy className="size-3.5" />
+        {showFilters && (
+          <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1">
+              <span className="text-xs text-gray-400 self-center mr-1">Statut :</span>
+              {(['tous', 'brouillon', 'finalisée'] as StatusFilter[]).map(s => (
+                <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="xs" onClick={() => setStatusFilter(s)}>
+                  {s === 'tous' ? 'Tous' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </Button>
-                {!isBrouillon && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => onDownload(invoice.id)}
-                    title="Télécharger PDF"
-                  >
-                    <Download className="size-3.5" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => setDeleteTarget(invoice)}
-                  title="Supprimer"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
+              ))}
             </div>
-          )
-        })}
+            <div className="flex gap-1">
+              <span className="text-xs text-gray-400 self-center mr-1">Paiement :</span>
+              {(['tous', 'en_attente', 'payee', 'en_retard'] as PaymentFilter[]).map(p => (
+                <Button key={p} variant={paymentFilter === p ? 'default' : 'outline'} size="xs" onClick={() => setPaymentFilter(p)}>
+                  {p === 'tous' ? 'Tous' : p === 'en_attente' ? 'En attente' : p === 'payee' ? 'Payée' : 'En retard'}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Filtres actifs */}
+        {hasFilters && (
+          <div className="flex flex-wrap gap-1">
+            {search && (
+              <Badge variant="secondary" className="cursor-pointer" onClick={() => setSearch('')}>
+                Recherche: "{search}" <X className="size-3 ml-1" />
+              </Badge>
+            )}
+            {statusFilter !== 'tous' && (
+              <Badge variant="secondary" className="cursor-pointer" onClick={() => setStatusFilter('tous')}>
+                {statusFilter} <X className="size-3 ml-1" />
+              </Badge>
+            )}
+            {paymentFilter !== 'tous' && (
+              <Badge variant="secondary" className="cursor-pointer" onClick={() => setPaymentFilter('tous')}>
+                {paymentFilter === 'en_attente' ? 'En attente' : paymentFilter === 'payee' ? 'Payée' : 'En retard'} <X className="size-3 ml-1" />
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Grille */}
+      {sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-gray-400 dark:text-gray-500">
+          <FileText className="size-16 mb-4 stroke-1" />
+          <p className="text-lg font-medium text-gray-500 dark:text-gray-400">
+            {hasFilters ? 'Aucune facture ne correspond à votre recherche' : 'Aucune facture sauvegardée'}
+          </p>
+          {!hasFilters && <p className="text-sm mt-1">Créez votre première !</p>}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sorted.map(invoice => {
+            const totals = calculateTotals(invoice.invoice.items)
+            const date = new Date(invoice.invoice.issueDate).toLocaleDateString('fr-FR')
+            const isBrouillon = invoice.status === 'brouillon'
+
+            return (
+              <div
+                key={invoice.id}
+                className="group bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col gap-3"
+              >
+                {/* En-tête carte */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
+                      {invoice.invoice.number}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {invoice.client.companyName || 'Client non renseigné'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1 items-end shrink-0">
+                    <Badge
+                      variant={isBrouillon ? 'secondary' : 'default'}
+                      className={
+                        isBrouillon
+                          ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
+                          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                      }
+                    >
+                      {invoice.status}
+                    </Badge>
+                    {!isBrouillon && invoice.paymentStatus && (
+                      <Badge variant="outline" className={PAYMENT_BADGE[invoice.paymentStatus].className}>
+                        {invoice.paymentStatus === 'en_retard' && <AlertTriangle className="size-3 mr-0.5" />}
+                        {PAYMENT_BADGE[invoice.paymentStatus].label}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Montant + date */}
+                <div className="flex items-baseline justify-between">
+                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    {formatEuro(totals.totalTTC)} €
+                  </span>
+                  <span className="text-xs text-gray-400">{date}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1 pt-1 border-t border-gray-100 dark:border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isBrouillon && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => onEdit(invoice.id)} title="Éditer">
+                      <Edit className="size-3.5" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon-sm" onClick={() => onDuplicate(invoice.id)} title="Dupliquer">
+                    <Copy className="size-3.5" />
+                  </Button>
+                  {!isBrouillon && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => onDownload(invoice.id)} title="Télécharger PDF">
+                      <Download className="size-3.5" />
+                    </Button>
+                  )}
+                  {!isBrouillon && invoice.paymentStatus !== 'payee' && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => onMarkPaid(invoice.id)} title="Marquer comme payée" className="text-emerald-500 hover:text-emerald-700">
+                      <CheckCircle className="size-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    onClick={() => setDeleteTarget(invoice)}
+                    title="Supprimer"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Modale de confirmation de suppression */}
-      <Dialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-      >
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Supprimer cette facture ?</DialogTitle>
@@ -147,18 +262,8 @@ export function InvoiceGallery({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Annuler
-            </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleteTarget) {
-                  onDelete(deleteTarget.id)
-                  setDeleteTarget(null)
-                }
-              }}
-            >
+            <DialogClose render={<Button variant="outline" />}>Annuler</DialogClose>
+            <Button variant="destructive" onClick={() => { if (deleteTarget) { onDelete(deleteTarget.id); setDeleteTarget(null) } }}>
               Supprimer
             </Button>
           </DialogFooter>

@@ -29,36 +29,36 @@ function generateInvoiceNumber(counter: number): string {
 
 export function getDefaultIssuer(): IssuerProfile {
   return {
-    companyName: '',
-    legalForm: '',
-    address: '',
-    postalCode: '',
-    city: '',
-    phone: '',
-    siret: '',
-    siren: '',
-    apeNaf: '',
-    tvaNumber: '',
-    shareCapital: '',
-    rcsCity: '',
-    rcProInsurer: '',
-    rcProScope: '',
-    bankName: '',
-    iban: '',
-    bic: '',
+    companyName: 'Studio Dupont Digital',
+    legalForm: 'SASU',
+    address: '12 rue des Lilas',
+    postalCode: '57000',
+    city: 'Metz',
+    phone: '06 12 34 56 78',
+    siret: '912 345 678 00012',
+    siren: '912 345 678',
+    apeNaf: '6201Z',
+    tvaNumber: 'FR 32 912345678',
+    shareCapital: '1 000 €',
+    rcsCity: 'Metz',
+    rcProInsurer: 'AXA France',
+    rcProScope: 'Conseil et développement informatique',
+    bankName: 'Crédit Mutuel',
+    iban: 'FR76 1027 8060 0100 0204 6830 174',
+    bic: 'CMCIFR2A',
     logo: '',
   }
 }
 
 export function getDefaultClient(): ClientInfo {
   return {
-    companyName: '',
-    contactName: '',
-    address: '',
-    postalCode: '',
-    city: '',
-    siren: '',
-    tvaNumber: '',
+    companyName: 'Boulangerie Martin & Fils',
+    contactName: 'Claire Martin',
+    address: '45 avenue de la République',
+    postalCode: '54000',
+    city: 'Nancy',
+    siren: '823 456 789',
+    tvaNumber: 'FR 61 823456789',
     codeService: '',
   }
 }
@@ -83,11 +83,33 @@ export function getDefaultInvoice(counter: number): InvoiceData {
     issueDate: formatDate(today),
     deliveryDate: formatDate(today),
     dueDate: formatDate(dueDate),
-    purchaseOrder: '',
+    purchaseOrder: 'BC-2026-042',
     paymentTerms: 'Virement bancaire à 30 jours',
     notes: '',
     deposit: 0,
-    items: [createDefaultLineItem()],
+    items: [
+      {
+        id: crypto.randomUUID(),
+        description: 'Création site vitrine WordPress (5 pages)',
+        quantity: 1,
+        unitPrice: 1800,
+        vatRate: 20,
+      },
+      {
+        id: crypto.randomUUID(),
+        description: 'Hébergement & nom de domaine (1 an)',
+        quantity: 1,
+        unitPrice: 120,
+        vatRate: 20,
+      },
+      {
+        id: crypto.randomUUID(),
+        description: 'Formation utilisation back-office (2h)',
+        quantity: 2,
+        unitPrice: 75,
+        vatRate: 20,
+      },
+    ],
   }
 }
 

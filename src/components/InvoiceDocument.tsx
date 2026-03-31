@@ -3,10 +3,11 @@ import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { InlineEdit } from '@/components/InlineEdit'
+import { ClientAutocomplete } from '@/components/ClientAutocomplete'
 import { LineItemsTable } from '@/components/LineItemsTable'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
 import { PLACEHOLDERS, LEGAL_MENTIONS } from '@/lib/constants'
-import type { IssuerProfile, ClientInfo, InvoiceData, LineItem } from '@/types/invoice'
+import type { IssuerProfile, ClientInfo, InvoiceData, LineItem, ArticleTemplate, ClientRecord } from '@/types/invoice'
 
 interface InvoiceDocumentProps {
   issuer: IssuerProfile
@@ -18,6 +19,13 @@ interface InvoiceDocumentProps {
   onAddLine: () => void
   onRemoveLine: (id: string) => void
   onUpdateLine: (id: string, partial: Partial<LineItem>) => void
+  // Clients autocomplete
+  findClientByName?: (query: string) => ClientRecord[]
+  onSelectClient?: (client: ClientInfo) => void
+  // Article templates
+  templates?: ArticleTemplate[]
+  onSaveAsTemplate?: (item: LineItem) => void
+  onInsertTemplate?: (template: ArticleTemplate) => void
 }
 
 // F5 fix: extracted reusable component to eliminate 20+ duplicate patterns
@@ -61,6 +69,11 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
       onAddLine,
       onRemoveLine,
       onUpdateLine,
+      findClientByName,
+      onSelectClient,
+      templates,
+      onSaveAsTemplate,
+      onInsertTemplate,
     },
     ref
   ) {
@@ -220,12 +233,23 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               Destinataire
             </h2>
             <div className="space-y-0.5">
-              <InlineEdit
-                value={client.companyName}
-                onChange={(v) => onUpdateClient({ companyName: v })}
-                placeholder={PLACEHOLDERS.client.companyName}
-                className="font-semibold"
-              />
+              {findClientByName && onSelectClient ? (
+                <ClientAutocomplete
+                  value={client.companyName}
+                  onChange={(v) => onUpdateClient({ companyName: v })}
+                  onSelectClient={onSelectClient}
+                  findByName={findClientByName}
+                  placeholder={PLACEHOLDERS.client.companyName}
+                  className="font-semibold text-sm px-0.5 py-0 border-none bg-transparent w-full cursor-text hover:bg-blue-50/60 dark:hover:bg-blue-900/30 focus:outline-none focus:bg-blue-50/40 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-200 dark:focus:ring-blue-800 rounded"
+                />
+              ) : (
+                <InlineEdit
+                  value={client.companyName}
+                  onChange={(v) => onUpdateClient({ companyName: v })}
+                  placeholder={PLACEHOLDERS.client.companyName}
+                  className="font-semibold"
+                />
+              )}
               <InlineEdit
                 value={client.contactName}
                 onChange={(v) => onUpdateClient({ contactName: v })}
@@ -295,6 +319,9 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           onAdd={onAddLine}
           onRemove={onRemoveLine}
           onUpdate={onUpdateLine}
+          templates={templates}
+          onSaveAsTemplate={onSaveAsTemplate}
+          onInsertTemplate={onInsertTemplate}
         />
 
         {/* ========== TOTALS ========== */}

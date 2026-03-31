@@ -146,6 +146,12 @@
   }
 }
 
+/* Apercu facture : toujours fond blanc meme en dark mode */
+.invoice-paper {
+  background: white !important;
+  color: #1a1a1a !important;
+}
+
 /* Mode capture PDF : cacher les elements interactifs + compacter pour A4 */
 .pdf-capture button:not([data-slot="select-trigger"]) {
   display: none !important;
