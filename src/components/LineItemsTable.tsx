@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Bookmark, BookmarkPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,18 @@ export function LineItemsTable({
   templates = [], onSaveAsTemplate, onInsertTemplate,
 }: LineItemsTableProps) {
   const [showTemplateMenu, setShowTemplateMenu] = useState(false)
+  const templateMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showTemplateMenu) return
+    function handleClickOutside(e: MouseEvent) {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
+        setShowTemplateMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showTemplateMenu])
 
   return (
     <div className="mt-8">
@@ -153,7 +165,7 @@ export function LineItemsTable({
         </Button>
 
         {onInsertTemplate && templates.length > 0 && (
-          <div className="relative">
+          <div className="relative" ref={templateMenuRef}>
             <Button
               variant="ghost"
               size="sm"

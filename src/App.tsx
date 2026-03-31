@@ -95,16 +95,7 @@ function App() {
         action: {
           label: 'Ajouter au carnet',
           onClick: () => {
-            addClient({
-              companyName: state.client.companyName,
-              contactName: state.client.contactName,
-              address: state.client.address,
-              postalCode: state.client.postalCode,
-              city: state.client.city,
-              siren: state.client.siren,
-              tvaNumber: state.client.tvaNumber,
-              codeService: state.client.codeService,
-            })
+            addClient({ ...state.client })
             toast.success('Client ajouté au carnet')
           },
         },
@@ -127,20 +118,12 @@ function App() {
     })
   }
 
-  // Insérer un modèle comme nouvelle ligne
+  // Insérer un modèle comme nouvelle ligne (atomique, pas de rAF)
   const handleInsertTemplate = (template: ArticleTemplate) => {
-    addLineItem()
-    // Mettre à jour la dernière ligne ajoutée avec les données du modèle
-    requestAnimationFrame(() => {
-      const items = state.invoice.items
-      const lastItem = items[items.length - 1]
-      if (lastItem) {
-        updateLineItem(lastItem.id, {
-          description: template.description,
-          unitPrice: template.unitPrice,
-          vatRate: template.vatRate as VatRate,
-        })
-      }
+    addLineItem({
+      description: template.description,
+      unitPrice: template.unitPrice,
+      vatRate: template.vatRate as VatRate,
     })
   }
 

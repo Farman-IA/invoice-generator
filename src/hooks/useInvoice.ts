@@ -85,6 +85,33 @@ export function useInvoice() {
     loadData()
   }, [])
 
+  // Recalculer le statut en_retard quand l'utilisateur revient sur l'onglet
+  useEffect(() => {
+    function checkLatePayments() {
+      const today = new Date().toISOString().split('T')[0]
+      let hasChanges = false
+      const updated = savedInvoicesRef.current.map(inv => {
+        if (inv.status === 'finalisée' && inv.paymentStatus === 'en_attente' && inv.invoice.dueDate < today) {
+          hasChanges = true
+          return { ...inv, paymentStatus: 'en_retard' as const }
+        }
+        return inv
+      })
+      if (hasChanges) {
+        setSavedInvoices(updated)
+        savedInvoicesRef.current = updated
+        storage.saveInvoices(updated)
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') checkLatePayments()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   // Persister le profil émetteur à chaque modification (debounced)
   const issuerSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -110,12 +137,12 @@ export function useInvoice() {
     setState(prev => ({ ...prev, invoice: { ...prev.invoice, ...partial } }))
   }, [])
 
-  const addLineItem = useCallback(() => {
+  const addLineItem = useCallback((data?: Partial<LineItem>) => {
     setState(prev => ({
       ...prev,
       invoice: {
         ...prev.invoice,
-        items: [...prev.invoice.items, createDefaultLineItem()],
+        items: [...prev.invoice.items, { ...createDefaultLineItem(), ...data }],
       },
     }))
   }, [])

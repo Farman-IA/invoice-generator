@@ -21,8 +21,13 @@ export function ClientAutocomplete({
   const [isOpen, setIsOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<ClientRecord[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
+  const justSelectedRef = useRef(false)
 
   useEffect(() => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false
+      return
+    }
     const results = findByName(value)
     setSuggestions(results)
     setIsOpen(results.length > 0)
@@ -39,6 +44,7 @@ export function ClientAutocomplete({
   }, [])
 
   const handleSelect = (client: ClientRecord) => {
+    justSelectedRef.current = true
     onSelectClient({
       companyName: client.companyName,
       contactName: client.contactName,
@@ -58,7 +64,7 @@ export function ClientAutocomplete({
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
-        onFocus={() => { if (suggestions.length > 0) setIsOpen(true) }}
+        onFocus={() => { if (suggestions.length > 0 && !justSelectedRef.current) setIsOpen(true) }}
         placeholder={placeholder}
         className={className}
       />
