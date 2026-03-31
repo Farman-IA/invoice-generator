@@ -1,99 +1,85 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
-import type { IssuerProfile, ClientInfo, InvoiceData, InvoiceState, LineItem } from '@/types/invoice'
-import { storage, STORAGE_KEYS } from '@/lib/storage'
-import { getDefaultIssuer, getDefaultClient, getDefaultInvoice, createDefaultLineItem } from '@/lib/constants'
-
-function loadInitialState(): { state: InvoiceState; wasRestored: boolean } {
-  const savedIssuer = storage.get<IssuerProfile>(STORAGE_KEYS.ISSUER_PROFILE)
-  const savedClient = storage.get<ClientInfo>(STORAGE_KEYS.CLIENT_CURRENT)
-  const savedInvoice = storage.get<InvoiceData>(STORAGE_KEYS.INVOICE_CURRENT)
-  const savedCounter = storage.get<number>(STORAGE_KEYS.INVOICE_COUNTER)
-
-  const hasData = savedIssuer !== null || savedClient !== null || savedInvoice !== null
-
-  const counter = savedCounter ?? 1
-
-  return {
-    state: {
-      issuer: savedIssuer ?? getDefaultIssuer(),
-      client: savedClient ?? getDefaultClient(),
-      invoice: savedInvoice ?? getDefaultInvoice(counter),
-      counter,
-    },
-    wasRestored: hasData,
-  }
-}
+import type {
+  IssuerProfile,
+  ClientInfo,
+  InvoiceData,
+  InvoiceState,
+  LineItem,
+  SavedInvoice,
+  AppView,
+} from '@/types/invoice'
+import { storage } from '@/lib/storage'
+import {
+  getDefaultIssuer,
+  getDefaultClient,
+  getDefaultInvoice,
+  createDefaultLineItem,
+  generateInvoiceNumber,
+} from '@/lib/constants'
 
 export function useInvoice() {
-  const [state, setState] = useState<InvoiceState>(() => loadInitialState().state)
+  const [state, setState] = useState<InvoiceState>({
+    issuer: getDefaultIssuer(),
+    client: getDefaultClient(),
+    invoice: getDefaultInvoice(1),
+    counter: 1,
+  })
+  const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>([])
+  const [currentInvoiceId, setCurrentInvoiceId] = useState<string | null>(null)
+  const [view, setView] = useState<AppView>('EDIT')
+  const [isFinalized, setIsFinalized] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const isInitialMount = useRef(true)
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // F1 fix: use ref for latest state to avoid stale closures in beforeunload
   const stateRef = useRef(state)
-
   useEffect(() => {
     stateRef.current = state
   }, [state])
 
-  // F7 fix: lightweight check for existing data instead of calling loadInitialState twice
+  // Charger les données depuis window.storage au montage
   useEffect(() => {
-    const hasData =
-      localStorage.getItem(STORAGE_KEYS.ISSUER_PROFILE) !== null ||
-      localStorage.getItem(STORAGE_KEYS.CLIENT_CURRENT) !== null ||
-      localStorage.getItem(STORAGE_KEYS.INVOICE_CURRENT) !== null
-    if (hasData) {
-      const id = toast.success('Données restaurées')
-      const timer = setTimeout(() => toast.dismiss(id), 3000)
-      return () => clearTimeout(timer)
+    async function loadData() {
+      try {
+        const [invoices, counter, issuer] = await Promise.all([
+          storage.getInvoices(),
+          storage.getCounter(),
+          storage.getIssuerProfile<IssuerProfile>(),
+        ])
+
+        setSavedInvoices(invoices)
+
+        setState(prev => ({
+          ...prev,
+          counter,
+          issuer: issuer ?? prev.issuer,
+          invoice: getDefaultInvoice(counter),
+        }))
+
+        if (invoices.length > 0 || issuer) {
+          toast.success('Données restaurées')
+        }
+      } catch {
+        // silently ignore
+      } finally {
+        setIsLoading(false)
+      }
     }
+
+    loadData()
   }, [])
 
-  // Save function
-  const saveToStorage = useCallback((currentState: InvoiceState) => {
-    storage.set(STORAGE_KEYS.ISSUER_PROFILE, currentState.issuer)
-    storage.set(STORAGE_KEYS.CLIENT_CURRENT, currentState.client)
-    storage.set(STORAGE_KEYS.INVOICE_CURRENT, currentState.invoice)
-    storage.set(STORAGE_KEYS.INVOICE_COUNTER, currentState.counter)
-  }, [])
-
-  // F8 fix: flush pending save on unmount instead of just clearing
+  // Persister le profil émetteur à chaque modification (debounced)
+  const issuerSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
-    }
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    saveTimeoutRef.current = setTimeout(() => {
-      saveToStorage(state)
-      saveTimeoutRef.current = null
-    }, 300)
-
+    if (isLoading) return
+    if (issuerSaveTimeout.current) clearTimeout(issuerSaveTimeout.current)
+    issuerSaveTimeout.current = setTimeout(() => {
+      storage.saveIssuerProfile(state.issuer)
+    }, 500)
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-        saveToStorage(stateRef.current)
-      }
+      if (issuerSaveTimeout.current) clearTimeout(issuerSaveTimeout.current)
     }
-  }, [state, saveToStorage])
-
-  // F1 fix: register beforeunload once, use stateRef for fresh data
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-        saveToStorage(stateRef.current)
-      }
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [saveToStorage])
+  }, [state.issuer, isLoading])
 
   const updateIssuer = useCallback((partial: Partial<IssuerProfile>) => {
     setState(prev => ({ ...prev, issuer: { ...prev.issuer, ...partial } }))
@@ -107,7 +93,6 @@ export function useInvoice() {
     setState(prev => ({ ...prev, invoice: { ...prev.invoice, ...partial } }))
   }, [])
 
-  // F6 fix: use shared createDefaultLineItem factory
   const addLineItem = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -118,7 +103,6 @@ export function useInvoice() {
     }))
   }, [])
 
-  // F2 fix: guard against removing the last line item
   const removeLineItem = useCallback((id: string) => {
     setState(prev => {
       if (prev.invoice.items.length <= 1) return prev
@@ -144,7 +128,178 @@ export function useInvoice() {
     }))
   }, [])
 
-  // F10 fix: removed redundant generateInvoiceNumber call
+  // Sauvegarder la facture courante dans la collection
+  const saveInvoice = useCallback(async () => {
+    const now = new Date().toISOString()
+    const current = stateRef.current
+
+    setSavedInvoices(prev => {
+      let updated: SavedInvoice[]
+
+      if (currentInvoiceId) {
+        // Mise à jour d'une facture existante
+        updated = prev.map(inv =>
+          inv.id === currentInvoiceId
+            ? {
+                ...inv,
+                issuer: current.issuer,
+                client: current.client,
+                invoice: current.invoice,
+                updatedAt: now,
+              }
+            : inv
+        )
+      } else {
+        // Nouvelle facture
+        const newId = crypto.randomUUID()
+        const newInvoice: SavedInvoice = {
+          id: newId,
+          issuer: current.issuer,
+          client: current.client,
+          invoice: current.invoice,
+          status: 'brouillon',
+          createdAt: now,
+          updatedAt: now,
+        }
+        updated = [newInvoice, ...prev]
+        setCurrentInvoiceId(newId)
+      }
+
+      // Persister immédiatement
+      storage.saveInvoices(updated)
+      storage.saveCounter(current.counter)
+      return updated
+    })
+
+    toast.success('Facture sauvegardée')
+  }, [currentInvoiceId])
+
+  // Finaliser la facture : statut → finalisée, sauvegarder, retourner true pour déclencher le PDF
+  const finalizeInvoice = useCallback(async (): Promise<boolean> => {
+    const now = new Date().toISOString()
+    const current = stateRef.current
+
+    let invoiceId = currentInvoiceId
+
+    const updated = savedInvoices.map(inv => {
+      if (inv.id === invoiceId) {
+        return {
+          ...inv,
+          issuer: current.issuer,
+          client: current.client,
+          invoice: current.invoice,
+          status: 'finalisée' as const,
+          updatedAt: now,
+        }
+      }
+      return inv
+    })
+
+    // Si la facture n'existe pas encore dans la collection, la créer
+    if (!invoiceId) {
+      invoiceId = crypto.randomUUID()
+      const newInvoice: SavedInvoice = {
+        id: invoiceId,
+        issuer: current.issuer,
+        client: current.client,
+        invoice: current.invoice,
+        status: 'finalisée',
+        createdAt: now,
+        updatedAt: now,
+      }
+      updated.unshift(newInvoice)
+      setCurrentInvoiceId(invoiceId)
+    }
+
+    setSavedInvoices(updated)
+    setIsFinalized(true)
+    await storage.saveInvoices(updated)
+    await storage.saveCounter(current.counter)
+    toast.success('Facture finalisée')
+    return true
+  }, [currentInvoiceId, savedInvoices])
+
+  // Charger une facture depuis la collection dans le formulaire
+  const loadInvoice = useCallback((id: string) => {
+    const invoice = savedInvoices.find(inv => inv.id === id)
+    if (!invoice) return
+
+    setState(prev => ({
+      ...prev,
+      issuer: invoice.issuer,
+      client: invoice.client,
+      invoice: invoice.invoice,
+    }))
+    setCurrentInvoiceId(id)
+    setIsFinalized(invoice.status === 'finalisée')
+    setView('EDIT')
+  }, [savedInvoices])
+
+  // Dupliquer une facture
+  const duplicateInvoice = useCallback(async (id: string) => {
+    const original = savedInvoices.find(inv => inv.id === id)
+    if (!original) return
+
+    const now = new Date().toISOString()
+    const newCounter = stateRef.current.counter + 1
+    const newNumber = generateInvoiceNumber(newCounter)
+
+    const today = new Date()
+    const dueDate = new Date(today)
+    dueDate.setDate(dueDate.getDate() + 30)
+
+    const duplicated: SavedInvoice = {
+      id: crypto.randomUUID(),
+      issuer: { ...original.issuer },
+      client: { ...original.client },
+      invoice: {
+        ...original.invoice,
+        number: newNumber,
+        issueDate: today.toISOString().split('T')[0],
+        dueDate: dueDate.toISOString().split('T')[0],
+        items: original.invoice.items.map(item => ({ ...item, id: crypto.randomUUID() })),
+      },
+      status: 'brouillon',
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const updated = [duplicated, ...savedInvoices]
+    setSavedInvoices(updated)
+    setState(prev => ({ ...prev, counter: newCounter }))
+    await storage.saveInvoices(updated)
+    await storage.saveCounter(newCounter)
+
+    // Charger la copie dans le formulaire
+    setState(prev => ({
+      ...prev,
+      issuer: duplicated.issuer,
+      client: duplicated.client,
+      invoice: duplicated.invoice,
+      counter: newCounter,
+    }))
+    setCurrentInvoiceId(duplicated.id)
+    setIsFinalized(false)
+    setView('EDIT')
+    toast.success('Facture dupliquée')
+  }, [savedInvoices])
+
+  // Supprimer une facture
+  const deleteInvoice = useCallback(async (id: string) => {
+    const updated = savedInvoices.filter(inv => inv.id !== id)
+    setSavedInvoices(updated)
+    await storage.saveInvoices(updated)
+
+    // Si c'est la facture en cours d'édition, réinitialiser
+    if (id === currentInvoiceId) {
+      setCurrentInvoiceId(null)
+      setIsFinalized(false)
+    }
+
+    toast.success('Facture supprimée')
+  }, [savedInvoices, currentInvoiceId])
+
+  // Créer une nouvelle facture vierge
   const newInvoice = useCallback(() => {
     setState(prev => {
       const newCounter = prev.counter + 1
@@ -155,18 +310,31 @@ export function useInvoice() {
         counter: newCounter,
       }
     })
+    setCurrentInvoiceId(null)
+    setIsFinalized(false)
+    setView('EDIT')
     toast.success('Nouvelle facture créée')
   }, [])
 
-  // F10 fix: removed unused invoiceRef
   return {
     state,
+    savedInvoices,
+    currentInvoiceId,
+    view,
+    isFinalized,
+    isLoading,
+    setView,
     updateIssuer,
     updateClient,
     updateInvoice,
     addLineItem,
     removeLineItem,
     updateLineItem,
+    saveInvoice,
+    finalizeInvoice,
+    loadInvoice,
+    duplicateInvoice,
+    deleteInvoice,
     newInvoice,
   }
 }

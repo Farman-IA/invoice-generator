@@ -1,35 +1,63 @@
-export const STORAGE_KEYS = {
-  ISSUER_PROFILE: 'issuer-profile',
-  CLIENT_CURRENT: 'client-current',
-  INVOICE_CURRENT: 'invoice-current',
+import type { SavedInvoice } from '@/types/invoice'
+
+const KEYS = {
+  INVOICES: 'invoices',
   INVOICE_COUNTER: 'invoice-counter',
+  ISSUER_PROFILE: 'issuer-profile',
 } as const
 
 export const storage = {
-  get<T>(key: string): T | null {
+  async getInvoices(): Promise<SavedInvoice[]> {
     try {
-      const raw = localStorage.getItem(key)
-      if (raw === null) return null
-      return JSON.parse(raw) as T
+      const result = await window.storage.get(KEYS.INVOICES)
+      return result ? JSON.parse(result.value) : []
     } catch {
-      return null
+      return []
     }
   },
 
-  set(key: string, value: unknown): boolean {
+  async saveInvoices(invoices: SavedInvoice[]): Promise<boolean> {
     try {
-      localStorage.setItem(key, JSON.stringify(value))
+      await window.storage.set(KEYS.INVOICES, JSON.stringify(invoices))
       return true
     } catch {
       return false
     }
   },
 
-  remove(key: string): void {
+  async getCounter(): Promise<number> {
     try {
-      localStorage.removeItem(key)
+      const result = await window.storage.get(KEYS.INVOICE_COUNTER)
+      return result ? JSON.parse(result.value) : 1
     } catch {
-      // silently ignore
+      return 1
+    }
+  },
+
+  async saveCounter(counter: number): Promise<boolean> {
+    try {
+      await window.storage.set(KEYS.INVOICE_COUNTER, JSON.stringify(counter))
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  async getIssuerProfile<T>(): Promise<T | null> {
+    try {
+      const result = await window.storage.get(KEYS.ISSUER_PROFILE)
+      return result ? JSON.parse(result.value) as T : null
+    } catch {
+      return null
+    }
+  },
+
+  async saveIssuerProfile(issuer: unknown): Promise<boolean> {
+    try {
+      await window.storage.set(KEYS.ISSUER_PROFILE, JSON.stringify(issuer))
+      return true
+    } catch {
+      return false
     }
   },
 }

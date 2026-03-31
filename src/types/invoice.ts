@@ -58,3 +58,17 @@ export interface InvoiceState {
   invoice: InvoiceData
   counter: number
 }
+
+export type InvoiceStatus = 'brouillon' | 'finalisée'
+
+export interface SavedInvoice {
+  id: string
+  issuer: IssuerProfile
+  client: ClientInfo
+  invoice: InvoiceData
+  status: InvoiceStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export type AppView = 'EDIT' | 'GALLERY'
