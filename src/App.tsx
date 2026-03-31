@@ -36,6 +36,7 @@ function App() {
     duplicateInvoice,
     deleteInvoice,
     markAsPaid,
+    markAsUnpaid,
     newInvoice,
   } = useInvoice()
 
@@ -194,6 +195,7 @@ function App() {
             onDelete={deleteInvoice}
             onDownload={handleGalleryDownload}
             onMarkPaid={markAsPaid}
+            onMarkUnpaid={markAsUnpaid}
           />
         </div>
       ) : (

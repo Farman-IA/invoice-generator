@@ -332,6 +332,21 @@ export function useInvoice() {
     toast.success('Facture marquée comme payée')
   }, [])
 
+  // Annuler le paiement (remettre en attente)
+  const markAsUnpaid = useCallback(async (id: string) => {
+    const today = new Date().toISOString().split('T')[0]
+    const updated = savedInvoicesRef.current.map(inv => {
+      if (inv.id !== id) return inv
+      const isLate = inv.invoice.dueDate < today
+      const newStatus: 'en_retard' | 'en_attente' = isLate ? 'en_retard' : 'en_attente'
+      return { ...inv, paymentStatus: newStatus, updatedAt: new Date().toISOString() }
+    })
+    setSavedInvoices(updated)
+    savedInvoicesRef.current = updated
+    await storage.saveInvoices(updated)
+    toast.success('Statut de paiement réinitialisé')
+  }, [])
+
   // Créer une nouvelle facture vierge
   const newInvoice = useCallback(async () => {
     const newCounter = stateRef.current.counter + 1
@@ -370,6 +385,7 @@ export function useInvoice() {
     duplicateInvoice,
     deleteInvoice,
     markAsPaid,
+    markAsUnpaid,
     newInvoice,
   }
 }

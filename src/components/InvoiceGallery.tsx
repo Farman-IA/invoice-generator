@@ -25,6 +25,7 @@ interface InvoiceGalleryProps {
   onDelete: (id: string) => void
   onDownload: (id: string) => void
   onMarkPaid: (id: string) => void
+  onMarkUnpaid: (id: string) => void
 }
 
 const PAYMENT_BADGE: Record<PaymentStatus, { label: string; className: string }> = {
@@ -34,7 +35,7 @@ const PAYMENT_BADGE: Record<PaymentStatus, { label: string; className: string }>
 }
 
 export function InvoiceGallery({
-  invoices, onEdit, onDuplicate, onDelete, onDownload, onMarkPaid,
+  invoices, onEdit, onDuplicate, onDelete, onDownload, onMarkPaid, onMarkUnpaid,
 }: InvoiceGalleryProps) {
   const [deleteTarget, setDeleteTarget] = useState<SavedInvoice | null>(null)
   const [search, setSearch] = useState('')
@@ -232,6 +233,11 @@ export function InvoiceGallery({
                   )}
                   {!isBrouillon && invoice.paymentStatus !== 'payee' && (
                     <Button variant="ghost" size="icon-sm" onClick={() => onMarkPaid(invoice.id)} title="Marquer comme payée" className="text-emerald-500 hover:text-emerald-700">
+                      <CheckCircle className="size-3.5" />
+                    </Button>
+                  )}
+                  {!isBrouillon && invoice.paymentStatus === 'payee' && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => onMarkUnpaid(invoice.id)} title="Annuler le paiement" className="text-orange-500 hover:text-orange-700">
                       <CheckCircle className="size-3.5" />
                     </Button>
                   )}
