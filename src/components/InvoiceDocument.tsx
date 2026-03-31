@@ -346,12 +346,14 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
         <div className="mt-4 flex justify-end no-print-pdf">
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>Acompte versé :</span>
-            <InlineEdit
-              value={invoice.deposit > 0 ? String(invoice.deposit) : ''}
-              onChange={(v) => onUpdateInvoice({ deposit: Math.max(0, Number(v) || 0) })}
-              as="number"
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={invoice.deposit > 0 ? invoice.deposit : ''}
+              onChange={(e) => onUpdateInvoice({ deposit: Math.max(0, Number(e.target.value) || 0) })}
               placeholder="0"
-              className="w-20 text-right text-sm"
+              className="w-24 rounded-sm border border-gray-200 bg-white px-2 py-1 text-right text-sm outline-none focus:ring-1 focus:ring-blue-200"
             />
             <span>€</span>
           </div>
