@@ -3,6 +3,15 @@ import { Plus, FileText, Save, Download, Sun, Moon, Settings, User, Users, Bookm
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog'
 import { InvoiceDocument } from '@/components/InvoiceDocument'
 import { InvoiceGallery } from '@/components/InvoiceGallery'
 import { ProfileModal } from '@/components/ProfileModal'
@@ -46,6 +55,7 @@ function App() {
 
   const invoiceRef = useRef<HTMLDivElement>(null)
 
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showClients, setShowClients] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -191,9 +201,9 @@ function App() {
                   <Save className="size-4 mr-1" />
                   Sauvegarder
                 </Button>
-                <Button size="sm" onClick={handleFinalize}>
+                <Button size="sm" onClick={() => setShowFinalizeConfirm(true)}>
                   <Download className="size-4 mr-1" />
-                  Finaliser
+                  Finaliser & PDF
                 </Button>
               </>
             )}
@@ -327,6 +337,27 @@ function App() {
         onUpdate={updateTemplate}
         onDelete={deleteTemplate}
       />
+
+      {/* Modale confirmation finalisation */}
+      <Dialog open={showFinalizeConfirm} onOpenChange={setShowFinalizeConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finaliser cette facture ?</DialogTitle>
+            <DialogDescription>
+              Une fois finalisée, la facture ne pourra plus être modifiée (obligation légale française). Un PDF sera généré et téléchargé automatiquement.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Annuler
+            </DialogClose>
+            <Button onClick={() => { setShowFinalizeConfirm(false); handleFinalize() }}>
+              <Download className="size-4 mr-1" />
+              Finaliser
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Toaster position="bottom-right" duration={3000} />
     </div>
