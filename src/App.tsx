@@ -138,52 +138,88 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header / Navbar */}
+      {/* Header unique */}
       <div className="no-print sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-sm font-semibold text-gray-600 dark:text-gray-300">Générateur de factures</h1>
-          <div className="flex gap-1.5">
-            {/* Outils */}
-            <Button variant="ghost" size="icon-sm" onClick={() => setShowProfile(true)} title="Mon profil">
-              <User className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => setShowClients(true)} title="Carnet de clients">
-              <Users className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => setShowTemplates(true)} title="Modèles d'articles">
-              <Bookmark className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={toggleTheme} title={theme === 'light' ? 'Mode sombre' : 'Mode clair'}>
-              {theme === 'light' ? <Moon className="size-4" /> : <Sun className="size-4" />}
-            </Button>
-
-            <div className="w-px bg-gray-200 dark:bg-gray-700 mx-1" />
-
-            {/* Navigation */}
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
+          {/* Navigation gauche */}
+          <nav className="flex gap-1">
             <Button
-              variant={view === 'EDIT' ? 'default' : 'outline'}
+              variant={view === 'EDIT' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => { if (view === 'GALLERY') newInvoice() }}
             >
-              <Plus className="size-4 mr-1.5" />
-              Nouvelle facture
+              <Plus className="size-4 mr-1" />
+              Nouvelle
             </Button>
             <Button
-              variant={view === 'GALLERY' ? 'default' : 'outline'}
+              variant={view === 'GALLERY' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setView('GALLERY')}
             >
-              <FileText className="size-4 mr-1.5" />
-              Mes factures
+              <FileText className="size-4 mr-1" />
+              Factures
               {savedInvoices.length > 0 && (
-                <span className="ml-1.5 bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
+                <span className="ml-1 text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full font-medium">
                   {savedInvoices.length}
                 </span>
               )}
             </Button>
+          </nav>
+
+          {/* Actions centrales (contextuelles) */}
+          <div className="flex-1 flex justify-center gap-2">
+            {view === 'EDIT' && !isFinalized && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleSaveInvoice}>
+                  <Save className="size-4 mr-1" />
+                  Sauvegarder
+                </Button>
+                <Button size="sm" onClick={handleFinalize}>
+                  <Download className="size-4 mr-1" />
+                  Finaliser
+                </Button>
+              </>
+            )}
+            {view === 'EDIT' && isFinalized && (
+              <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
+                <Download className="size-4 mr-1" />
+                Télécharger PDF
+              </Button>
+            )}
+          </div>
+
+          {/* Outils droite */}
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="xs" onClick={() => setShowProfile(true)} className="text-gray-500 dark:text-gray-400">
+              <User className="size-3.5 mr-1" />
+              <span className="text-xs">Profil</span>
+            </Button>
+            <Button variant="ghost" size="xs" onClick={() => setShowClients(true)} className="text-gray-500 dark:text-gray-400">
+              <Users className="size-3.5 mr-1" />
+              <span className="text-xs">Clients</span>
+            </Button>
+            <Button variant="ghost" size="xs" onClick={() => setShowTemplates(true)} className="text-gray-500 dark:text-gray-400">
+              <Bookmark className="size-3.5 mr-1" />
+              <span className="text-xs">Modèles</span>
+            </Button>
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
+            <Button variant="ghost" size="icon-xs" onClick={toggleTheme} className="text-gray-500 dark:text-gray-400">
+              {theme === 'light' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Bandeau finalisée */}
+      {view === 'EDIT' && isFinalized && (
+        <div className="no-print bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800">
+          <div className="max-w-5xl mx-auto px-4 py-2 text-center">
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+              Facture finalisée — dupliquez-la pour créer une variante
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Contenu principal */}
       {view === 'GALLERY' ? (
@@ -200,35 +236,6 @@ function App() {
         </div>
       ) : (
         <>
-          {/* Barre d'action édition */}
-          {!isFinalized && (
-            <div className="no-print bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-              <div className="max-w-[210mm] mx-auto px-4 py-2 flex items-center justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handleSaveInvoice}>
-                  <Save className="size-4 mr-1.5" />
-                  Sauvegarder
-                </Button>
-                <Button size="sm" onClick={handleFinalize}>
-                  <Download className="size-4 mr-1.5" />
-                  Finaliser & Télécharger
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {isFinalized && (
-            <div className="no-print bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800">
-              <div className="max-w-[210mm] mx-auto px-4 py-2 flex items-center justify-between">
-                <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                  Cette facture est finalisée. Dupliquez-la pour créer une variante.
-                </p>
-                <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
-                  <Download className="size-4 mr-1.5" />
-                  Télécharger PDF
-                </Button>
-              </div>
-            </div>
-          )}
 
           {/* Formulaire facture */}
           <div className="py-8 px-4">
