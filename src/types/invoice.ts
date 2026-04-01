@@ -72,7 +72,7 @@ export interface SavedInvoice {
   updatedAt: string
 }
 
-export type AppView = 'EDIT' | 'GALLERY' | 'QUOTE_EDIT' | 'QUOTE_GALLERY'
+export type AppView = 'DASHBOARD' | 'EDIT' | 'GALLERY' | 'QUOTE_EDIT' | 'QUOTE_GALLERY'
 
 export type QuoteStatus = 'brouillon' | 'envoyé' | 'accepté' | 'refusé'
 

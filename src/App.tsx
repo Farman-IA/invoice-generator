@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { Plus, FileText, FilePen, Save, Download, Sun, Moon, Settings, User, Users, Bookmark } from 'lucide-react'
+import { LayoutDashboard, Plus, FileText, FilePen, Save, Download, Sun, Moon, Settings, User, Users, Bookmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
+import { Dashboard } from '@/components/Dashboard'
 import { InvoiceDocument } from '@/components/InvoiceDocument'
 import { InvoiceGallery } from '@/components/InvoiceGallery'
 import { QuoteGallery } from '@/components/QuoteGallery'
@@ -39,7 +40,7 @@ function App() {
   const docRef = useRef<HTMLDivElement>(null)
 
   // Vue globale (unifie factures et devis)
-  const [view, setGlobalView] = useState<AppView>('EDIT')
+  const [view, setGlobalView] = useState<AppView>('DASHBOARD')
 
 
 
@@ -192,6 +193,12 @@ function App() {
         <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
           {/* Navigation */}
           <nav className="flex gap-1">
+            <Button variant={view === 'DASHBOARD' ? 'default' : 'ghost'} size="sm"
+              onClick={() => setGlobalView('DASHBOARD')}>
+              <LayoutDashboard className="size-4 mr-1" />
+              Accueil
+            </Button>
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 self-center" />
             <Button variant={view === 'EDIT' ? 'default' : 'ghost'} size="sm"
               onClick={() => { inv.newInvoice(); setGlobalView('EDIT') }}>
               <Plus className="size-4 mr-1" />
@@ -319,6 +326,17 @@ function App() {
       )}
 
       {/* Contenu */}
+      {view === 'DASHBOARD' && (
+        <Dashboard
+          invoices={inv.savedInvoices}
+          quotes={qt.savedQuotes}
+          onViewInvoices={() => setGlobalView('GALLERY')}
+          onViewQuotes={() => setGlobalView('QUOTE_GALLERY')}
+          onEditInvoice={(id) => { inv.loadInvoice(id); setGlobalView('EDIT') }}
+          onEditQuote={(id) => { qt.loadQuote(id); setGlobalView('QUOTE_EDIT') }}
+        />
+      )}
+
       {view === 'GALLERY' && (
         <div className="max-w-5xl mx-auto py-8 px-4">
           <InvoiceGallery
