@@ -144,11 +144,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
             <div className="space-y-0.5">
               <div className="flex items-center justify-end gap-2 text-sm">
                 <span className="text-gray-500">N°</span>
-                <InlineEdit
-                  value={invoice.number}
-                  onChange={(v) => onUpdateInvoice({ number: v })}
-                  className="font-semibold"
-                />
+                <span className="font-semibold">{invoice.number}</span>
               </div>
               <div className="flex items-center justify-end gap-2 text-sm">
                 <InlineEdit
