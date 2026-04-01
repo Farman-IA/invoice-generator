@@ -76,7 +76,7 @@ export function ProfileModal({ open, onOpenChange, issuer, onUpdateIssuer }: Pro
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 {FIELDS.filter(f => f.section === section.id).map(field => (
-                  <div key={field.key} className={field.key === 'address' ? 'col-span-2' : ''}>
+                  <div key={field.key} className={field.key === 'address' || field.key === 'companyName' ? 'col-span-2' : ''}>
                     <label className="text-xs text-gray-500 dark:text-gray-400">{field.label}</label>
                     <input
                       type="text"
