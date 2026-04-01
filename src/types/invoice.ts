@@ -72,7 +72,30 @@ export interface SavedInvoice {
   updatedAt: string
 }
 
-export type AppView = 'EDIT' | 'GALLERY'
+export type AppView = 'EDIT' | 'GALLERY' | 'QUOTE_EDIT' | 'QUOTE_GALLERY'
+
+export type QuoteStatus = 'brouillon' | 'envoyé' | 'accepté' | 'refusé'
+
+export interface QuoteData {
+  number: string
+  issueDate: string
+  validityDays: number
+  validUntil: string
+  purchaseOrder: string
+  notes: string
+  items: LineItem[]
+}
+
+export interface SavedQuote {
+  id: string
+  issuer: IssuerProfile
+  client: ClientInfo
+  quote: QuoteData
+  status: QuoteStatus
+  linkedInvoiceId?: string
+  createdAt: string
+  updatedAt: string
+}
 
 export type PaymentStatus = 'en_attente' | 'payee' | 'en_retard'
 

@@ -1,4 +1,4 @@
-import type { VatRate, IssuerProfile, ClientInfo, InvoiceData, LineItem } from '@/types/invoice'
+import type { VatRate, IssuerProfile, ClientInfo, InvoiceData, QuoteData, LineItem } from '@/types/invoice'
 
 export const VAT_RATES: { value: VatRate; label: string; description: string }[] = [
   {
@@ -114,6 +114,36 @@ export function getDefaultInvoice(counter: number): InvoiceData {
 }
 
 export { generateInvoiceNumber }
+
+function generateQuoteNumber(counter: number): string {
+  const year = new Date().getFullYear()
+  return `DEV-${year}-${String(counter).padStart(3, '0')}`
+}
+
+export { generateQuoteNumber }
+
+export const VALIDITY_OPTIONS = [
+  { value: 15, label: '15 jours' },
+  { value: 30, label: '30 jours' },
+  { value: 60, label: '60 jours' },
+  { value: 90, label: '90 jours' },
+]
+
+export function getDefaultQuote(counter: number): QuoteData {
+  const today = new Date()
+  const validUntil = new Date(today)
+  validUntil.setDate(validUntil.getDate() + 30)
+
+  return {
+    number: generateQuoteNumber(counter),
+    issueDate: formatDate(today),
+    validityDays: 30,
+    validUntil: formatDate(validUntil),
+    purchaseOrder: '',
+    notes: '',
+    items: [createDefaultLineItem()],
+  }
+}
 
 export const LEGAL_MENTIONS = {
   latePaymentPenalty:

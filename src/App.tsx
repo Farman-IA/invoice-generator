@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react'
-import { Plus, FileText, Save, Download, Sun, Moon, Settings, User, Users, Bookmark } from 'lucide-react'
+import { useRef, useEffect, useState } from 'react'
+import { Plus, FileText, FilePen, Save, Download, Sun, Moon, Settings, User, Users, Bookmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
@@ -14,46 +14,34 @@ import {
 } from '@/components/ui/dialog'
 import { InvoiceDocument } from '@/components/InvoiceDocument'
 import { InvoiceGallery } from '@/components/InvoiceGallery'
+import { QuoteGallery } from '@/components/QuoteGallery'
 import { ProfileModal } from '@/components/ProfileModal'
 import { ClientsManager } from '@/components/ClientsManager'
 import { TemplatesManager } from '@/components/TemplatesManager'
 import { useInvoice } from '@/hooks/useInvoice'
+import { useQuotes } from '@/hooks/useQuotes'
 import { useClients } from '@/hooks/useClients'
 import { useArticleTemplates } from '@/hooks/useArticleTemplates'
 import { useTheme } from '@/hooks/useTheme'
 import { generatePDF } from '@/lib/pdf'
-import { useState } from 'react'
-import type { ClientInfo, LineItem, ArticleTemplate, VatRate } from '@/types/invoice'
+import type { ClientInfo, LineItem, ArticleTemplate, VatRate, AppView } from '@/types/invoice'
 
 function App() {
-  const {
-    state,
-    savedInvoices,
-    view,
-    isFinalized,
-    isLoading,
-    setView,
-    updateIssuer,
-    updateClient,
-    updateInvoice,
-    addLineItem,
-    removeLineItem,
-    updateLineItem,
-    saveInvoice,
-    finalizeInvoice,
-    loadInvoice,
-    duplicateInvoice,
-    deleteInvoice,
-    markAsPaid,
-    markAsUnpaid,
-    newInvoice,
-  } = useInvoice()
+  // Factures
+  const inv = useInvoice()
+  // Devis
+  const qt = useQuotes()
 
   const { clients, addClient, updateClient: updateClientRecord, deleteClient: deleteClientRecord, findByName, existsByName } = useClients()
   const { templates, addTemplate, updateTemplate, deleteTemplate } = useArticleTemplates()
   const { theme, toggleTheme } = useTheme()
 
-  const invoiceRef = useRef<HTMLDivElement>(null)
+  const docRef = useRef<HTMLDivElement>(null)
+
+  // Vue globale (unifie factures et devis)
+  const [view, setGlobalView] = useState<AppView>('EDIT')
+
+
 
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -65,93 +53,129 @@ function App() {
   useEffect(() => {
     if (!showSettings) return
     function handleClick(e: MouseEvent) {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
-        setShowSettings(false)
-      }
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setShowSettings(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showSettings])
 
+  // --- Handlers factures ---
   const handleDownloadPDF = async () => {
-    if (!invoiceRef.current) return
-    await generatePDF(invoiceRef.current, state.invoice.number, state.client.companyName)
+    if (!docRef.current) return
+    await generatePDF(docRef.current, inv.state.invoice.number, inv.state.client.companyName)
   }
 
   const handleFinalize = async () => {
-    const invoiceNumber = state.invoice.number
-    const clientName = state.client.companyName
-
-    const ok = await finalizeInvoice()
+    const num = inv.state.invoice.number
+    const client = inv.state.client.companyName
+    const ok = await inv.finalizeInvoice()
     if (ok) {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (invoiceRef.current) {
-            generatePDF(invoiceRef.current, invoiceNumber, clientName)
-          }
-        })
+        requestAnimationFrame(() => { if (docRef.current) generatePDF(docRef.current, num, client) })
       })
     }
   }
 
   const handleGalleryDownload = (id: string) => {
-    const invoice = savedInvoices.find(inv => inv.id === id)
+    const invoice = inv.savedInvoices.find(i => i.id === id)
     if (!invoice) return
-    const invoiceNumber = invoice.invoice.number
-    const clientName = invoice.client.companyName
-    loadInvoice(id)
+    const num = invoice.invoice.number
+    const client = invoice.client.companyName
+    inv.loadInvoice(id)
+    setGlobalView('EDIT')
     requestAnimationFrame(() => {
       requestAnimationFrame(async () => {
-        if (invoiceRef.current) {
-          await generatePDF(invoiceRef.current, invoiceNumber, clientName)
-          setView('GALLERY')
-        }
+        if (docRef.current) { await generatePDF(docRef.current, num, client); setGlobalView('GALLERY') }
       })
     })
   }
 
-  // Sauvegarder + proposer ajout client au carnet
   const handleSaveInvoice = async () => {
-    await saveInvoice()
-    const clientName = state.client.companyName.trim()
+    await inv.saveInvoice()
+    const clientName = inv.state.client.companyName.trim()
     if (clientName && !existsByName(clientName)) {
       toast('Nouveau client détecté', {
-        action: {
-          label: 'Ajouter au carnet',
-          onClick: () => {
-            addClient({ ...state.client })
-            toast.success('Client ajouté au carnet')
-          },
-        },
+        action: { label: 'Ajouter au carnet', onClick: () => { addClient({ ...inv.state.client }); toast.success('Client ajouté') } },
         duration: 5000,
       })
     }
   }
 
-  // Sélection client depuis autocomplete
+  // --- Handlers devis ---
+  const handleSaveQuote = async () => {
+    await qt.saveQuote()
+    const clientName = qt.state.client.companyName.trim()
+    if (clientName && !existsByName(clientName)) {
+      toast('Nouveau client détecté', {
+        action: { label: 'Ajouter au carnet', onClick: () => { addClient({ ...qt.state.client }); toast.success('Client ajouté') } },
+        duration: 5000,
+      })
+    }
+  }
+
+  const handleQuoteDownload = (id: string) => {
+    const quote = qt.savedQuotes.find(q => q.id === id)
+    if (!quote) return
+    const num = quote.quote.number
+    const client = quote.client.companyName
+    qt.loadQuote(id)
+    setGlobalView('QUOTE_EDIT')
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        if (docRef.current) { await generatePDF(docRef.current, num, client); setGlobalView('QUOTE_GALLERY') }
+      })
+    })
+  }
+
+  const handleQuotePDF = async () => {
+    if (!docRef.current) return
+    await generatePDF(docRef.current, qt.state.quote.number, qt.state.client.companyName)
+    toast.success('PDF du devis téléchargé')
+  }
+
+  // Conversion devis → facture
+  const handleConvertToInvoice = async (quoteId: string) => {
+    const quote = qt.savedQuotes.find(q => q.id === quoteId)
+    if (!quote) return
+
+    // Pré-remplir une nouvelle facture avec les données du devis
+    inv.newInvoice()
+
+    // Attendre un tick pour que newInvoice ait mis à jour le state
+    requestAnimationFrame(() => {
+      inv.updateIssuer(quote.issuer)
+      inv.updateClient(quote.client)
+      inv.updateInvoice({
+        purchaseOrder: quote.quote.purchaseOrder,
+        notes: `Réf. devis : ${quote.quote.number}\n${quote.quote.notes}`,
+        items: quote.quote.items.map(item => ({ ...item, id: crypto.randomUUID() })),
+      })
+
+      // Lier le devis à la facture (le lien sera mis à jour après save)
+      qt.linkToInvoice(quoteId, 'pending')
+
+      setGlobalView('EDIT')
+      toast.success(`Devis ${quote.quote.number} converti — vérifiez et sauvegardez la facture`)
+    })
+  }
+
+  // --- Shared handlers ---
   const handleSelectClient = (client: ClientInfo) => {
-    updateClient(client)
+    if (view === 'QUOTE_EDIT') qt.updateClient(client)
+    else inv.updateClient(client)
   }
 
-  // Sauvegarder une ligne comme modèle
   const handleSaveAsTemplate = (item: LineItem) => {
-    addTemplate({
-      description: item.description,
-      unitPrice: item.unitPrice,
-      vatRate: item.vatRate,
-    })
+    addTemplate({ description: item.description, unitPrice: item.unitPrice, vatRate: item.vatRate })
   }
 
-  // Insérer un modèle comme nouvelle ligne (atomique, pas de rAF)
   const handleInsertTemplate = (template: ArticleTemplate) => {
-    addLineItem({
-      description: template.description,
-      unitPrice: template.unitPrice,
-      vatRate: template.vatRate as VatRate,
-    })
+    const data = { description: template.description, unitPrice: template.unitPrice, vatRate: template.vatRate as VatRate }
+    if (view === 'QUOTE_EDIT') qt.addLineItem(data)
+    else inv.addLineItem(data)
   }
 
-  if (isLoading) {
+  if (inv.isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center">
         <p className="text-gray-400 text-sm">Chargement...</p>
@@ -159,43 +183,54 @@ function App() {
     )
   }
 
+  const isEditView = view === 'EDIT' || view === 'QUOTE_EDIT'
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       {/* Header */}
       <div className="no-print sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
-          {/* Gauche : navigation */}
+          {/* Navigation */}
           <nav className="flex gap-1">
-            <Button
-              variant={view === 'EDIT' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => { if (view === 'GALLERY') newInvoice() }}
-            >
+            <Button variant={view === 'EDIT' ? 'default' : 'ghost'} size="sm"
+              onClick={() => { inv.newInvoice(); setGlobalView('EDIT') }}>
               <Plus className="size-4 mr-1" />
-              Nouvelle
+              Facture
             </Button>
-            <Button
-              variant={view === 'GALLERY' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setView('GALLERY')}
-            >
+            <Button variant={view === 'GALLERY' ? 'default' : 'ghost'} size="sm"
+              onClick={() => setGlobalView('GALLERY')}>
               <FileText className="size-4 mr-1" />
               Factures
-              {savedInvoices.length > 0 && (
+              {inv.savedInvoices.length > 0 && (
                 <span className="ml-1 text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full font-medium">
-                  {savedInvoices.length}
+                  {inv.savedInvoices.length}
+                </span>
+              )}
+            </Button>
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 self-center" />
+            <Button variant={view === 'QUOTE_EDIT' ? 'default' : 'ghost'} size="sm"
+              onClick={() => { qt.newQuote(); setGlobalView('QUOTE_EDIT') }}>
+              <Plus className="size-4 mr-1" />
+              Devis
+            </Button>
+            <Button variant={view === 'QUOTE_GALLERY' ? 'default' : 'ghost'} size="sm"
+              onClick={() => setGlobalView('QUOTE_GALLERY')}>
+              <FilePen className="size-4 mr-1" />
+              Devis
+              {qt.savedQuotes.length > 0 && (
+                <span className="ml-1 text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full font-medium">
+                  {qt.savedQuotes.length}
                 </span>
               )}
             </Button>
           </nav>
 
-          {/* Espace flexible */}
           <div className="flex-1" />
 
-          {/* Droite : actions principales + réglages + thème */}
+          {/* Actions contextuelles */}
           <div className="flex items-center gap-2">
-            {/* Actions contextuelles — toujours à droite, bien visibles */}
-            {view === 'EDIT' && !isFinalized && (
+            {/* Facture : édition */}
+            {view === 'EDIT' && !inv.isFinalized && (
               <>
                 <Button variant="outline" size="sm" onClick={handleSaveInvoice}>
                   <Save className="size-4 mr-1" />
@@ -207,57 +242,59 @@ function App() {
                 </Button>
               </>
             )}
-            {view === 'EDIT' && isFinalized && (
+            {view === 'EDIT' && inv.isFinalized && (
               <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
                 <Download className="size-4 mr-1" />
                 Télécharger PDF
               </Button>
             )}
 
-            {/* Séparateur si des actions sont affichées */}
-            {view === 'EDIT' && (
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
+            {/* Devis : édition */}
+            {view === 'QUOTE_EDIT' && !qt.isLocked && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleSaveQuote}>
+                  <Save className="size-4 mr-1" />
+                  Sauvegarder
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleQuotePDF}>
+                  <Download className="size-4 mr-1" />
+                  Télécharger PDF
+                </Button>
+              </>
+            )}
+            {view === 'QUOTE_EDIT' && qt.isLocked && (
+              <Button variant="outline" size="sm" onClick={handleQuotePDF}>
+                <Download className="size-4 mr-1" />
+                Télécharger PDF
+              </Button>
             )}
 
-            {/* Menu réglages */}
+            {isEditView && <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />}
+
+            {/* Réglages */}
             <div className="relative" ref={settingsRef}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSettings(s => !s)}
-                className="text-gray-500 dark:text-gray-400"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowSettings(s => !s)} className="text-gray-500 dark:text-gray-400">
                 <Settings className="size-4 mr-1" />
                 Réglages
               </Button>
               {showSettings && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden z-50">
-                  <button
-                    onClick={() => { setShowProfile(true); setShowSettings(false) }}
-                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <User className="size-4 text-gray-400" />
-                    <span className="text-gray-700 dark:text-gray-200">Mon profil</span>
+                  <button onClick={() => { setShowProfile(true); setShowSettings(false) }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                    <User className="size-4 text-gray-400" /><span className="text-gray-700 dark:text-gray-200">Mon profil</span>
                   </button>
-                  <button
-                    onClick={() => { setShowClients(true); setShowSettings(false) }}
-                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
-                  >
-                    <Users className="size-4 text-gray-400" />
-                    <span className="text-gray-700 dark:text-gray-200">Carnet de clients</span>
+                  <button onClick={() => { setShowClients(true); setShowSettings(false) }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
+                    <Users className="size-4 text-gray-400" /><span className="text-gray-700 dark:text-gray-200">Carnet de clients</span>
                   </button>
-                  <button
-                    onClick={() => { setShowTemplates(true); setShowSettings(false) }}
-                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
-                  >
-                    <Bookmark className="size-4 text-gray-400" />
-                    <span className="text-gray-700 dark:text-gray-200">Modèles d'articles</span>
+                  <button onClick={() => { setShowTemplates(true); setShowSettings(false) }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700">
+                    <Bookmark className="size-4 text-gray-400" /><span className="text-gray-700 dark:text-gray-200">Modèles d'articles</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Thème */}
             <Button variant="ghost" size="icon-sm" onClick={toggleTheme} className="text-gray-500 dark:text-gray-400">
               {theme === 'light' ? <Moon className="size-4" /> : <Sun className="size-4" />}
             </Button>
@@ -266,79 +303,101 @@ function App() {
       </div>
 
       {/* Bandeau finalisée */}
-      {view === 'EDIT' && isFinalized && (
+      {view === 'EDIT' && inv.isFinalized && (
         <div className="no-print bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800">
           <div className="max-w-5xl mx-auto px-4 py-2 text-center">
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
-              Facture finalisée — dupliquez-la pour créer une variante
-            </p>
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">Facture finalisée — dupliquez-la pour créer une variante</p>
+          </div>
+        </div>
+      )}
+      {view === 'QUOTE_EDIT' && qt.isLocked && (
+        <div className="no-print bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+          <div className="max-w-5xl mx-auto px-4 py-2 text-center">
+            <p className="text-sm text-blue-700 dark:text-blue-400">Ce devis n'est plus modifiable (statut : {qt.savedQuotes.find(q => q.id === qt.currentQuoteId)?.status})</p>
           </div>
         </div>
       )}
 
-      {/* Contenu principal */}
-      {view === 'GALLERY' ? (
+      {/* Contenu */}
+      {view === 'GALLERY' && (
         <div className="max-w-5xl mx-auto py-8 px-4">
           <InvoiceGallery
-            invoices={savedInvoices}
-            onEdit={loadInvoice}
-            onDuplicate={duplicateInvoice}
-            onDelete={deleteInvoice}
+            invoices={inv.savedInvoices}
+            onEdit={(id) => { inv.loadInvoice(id); setGlobalView('EDIT') }}
+            onDuplicate={inv.duplicateInvoice}
+            onDelete={inv.deleteInvoice}
             onDownload={handleGalleryDownload}
-            onMarkPaid={markAsPaid}
-            onMarkUnpaid={markAsUnpaid}
+            onMarkPaid={inv.markAsPaid}
+            onMarkUnpaid={inv.markAsUnpaid}
           />
         </div>
-      ) : (
-        <>
+      )}
 
-          {/* Formulaire facture */}
-          <div className="py-8 px-4">
-            <InvoiceDocument
-              ref={invoiceRef}
-              issuer={state.issuer}
-              client={state.client}
-              invoice={state.invoice}
-              onUpdateIssuer={isFinalized ? () => {} : updateIssuer}
-              onUpdateClient={isFinalized ? () => {} : updateClient}
-              onUpdateInvoice={isFinalized ? () => {} : updateInvoice}
-              onAddLine={isFinalized ? () => {} : addLineItem}
-              onRemoveLine={isFinalized ? () => {} : removeLineItem}
-              onUpdateLine={isFinalized ? () => {} : updateLineItem}
-              findClientByName={isFinalized ? undefined : findByName}
-              onSelectClient={isFinalized ? undefined : handleSelectClient}
-              templates={isFinalized ? undefined : templates}
-              onSaveAsTemplate={isFinalized ? undefined : handleSaveAsTemplate}
-              onInsertTemplate={isFinalized ? undefined : handleInsertTemplate}
-            />
-          </div>
-        </>
+      {view === 'QUOTE_GALLERY' && (
+        <div className="max-w-5xl mx-auto py-8 px-4">
+          <QuoteGallery
+            quotes={qt.savedQuotes}
+            onEdit={(id) => { qt.loadQuote(id); setGlobalView('QUOTE_EDIT') }}
+            onDuplicate={(id) => { qt.duplicateQuote(id); setGlobalView('QUOTE_EDIT') }}
+            onDelete={qt.deleteQuote}
+            onDownload={handleQuoteDownload}
+            onUpdateStatus={qt.updateQuoteStatus}
+            onConvertToInvoice={handleConvertToInvoice}
+          />
+        </div>
+      )}
+
+      {view === 'EDIT' && (
+        <div className="py-8 px-4">
+          <InvoiceDocument
+            ref={docRef}
+            mode="invoice"
+            issuer={inv.state.issuer}
+            client={inv.state.client}
+            invoice={inv.state.invoice}
+            onUpdateIssuer={inv.isFinalized ? () => {} : inv.updateIssuer}
+            onUpdateClient={inv.isFinalized ? () => {} : inv.updateClient}
+            onUpdateInvoice={inv.isFinalized ? () => {} : inv.updateInvoice}
+            onAddLine={inv.isFinalized ? () => {} : inv.addLineItem}
+            onRemoveLine={inv.isFinalized ? () => {} : inv.removeLineItem}
+            onUpdateLine={inv.isFinalized ? () => {} : inv.updateLineItem}
+            findClientByName={inv.isFinalized ? undefined : findByName}
+            onSelectClient={inv.isFinalized ? undefined : handleSelectClient}
+            templates={inv.isFinalized ? undefined : templates}
+            onSaveAsTemplate={inv.isFinalized ? undefined : handleSaveAsTemplate}
+            onInsertTemplate={inv.isFinalized ? undefined : handleInsertTemplate}
+          />
+        </div>
+      )}
+
+      {view === 'QUOTE_EDIT' && (
+        <div className="py-8 px-4">
+          <InvoiceDocument
+            ref={docRef}
+            mode="quote"
+            issuer={qt.state.issuer}
+            client={qt.state.client}
+            invoice={qt.state.quote}
+            onUpdateIssuer={qt.isLocked ? () => {} : qt.updateIssuer}
+            onUpdateClient={qt.isLocked ? () => {} : qt.updateClient}
+            onUpdateInvoice={qt.isLocked ? () => {} : qt.updateQuote}
+            onAddLine={qt.isLocked ? () => {} : qt.addLineItem}
+            onRemoveLine={qt.isLocked ? () => {} : qt.removeLineItem}
+            onUpdateLine={qt.isLocked ? () => {} : qt.updateLineItem}
+            findClientByName={qt.isLocked ? undefined : findByName}
+            onSelectClient={qt.isLocked ? undefined : handleSelectClient}
+            templates={qt.isLocked ? undefined : templates}
+            onSaveAsTemplate={qt.isLocked ? undefined : handleSaveAsTemplate}
+            onInsertTemplate={qt.isLocked ? undefined : handleInsertTemplate}
+          />
+        </div>
       )}
 
       {/* Modales */}
-      <ProfileModal
-        open={showProfile}
-        onOpenChange={setShowProfile}
-        issuer={state.issuer}
-        onUpdateIssuer={updateIssuer}
-      />
-      <ClientsManager
-        open={showClients}
-        onOpenChange={setShowClients}
-        clients={clients}
-        onUpdate={updateClientRecord}
-        onDelete={deleteClientRecord}
-      />
-      <TemplatesManager
-        open={showTemplates}
-        onOpenChange={setShowTemplates}
-        templates={templates}
-        onAdd={addTemplate}
-        onUpdate={updateTemplate}
-        onDelete={deleteTemplate}
-      />
+      <ProfileModal open={showProfile} onOpenChange={setShowProfile} issuer={inv.state.issuer} onUpdateIssuer={inv.updateIssuer} />
+      <ClientsManager open={showClients} onOpenChange={setShowClients} clients={clients} onUpdate={updateClientRecord} onDelete={deleteClientRecord} />
+      <TemplatesManager open={showTemplates} onOpenChange={setShowTemplates} templates={templates} onAdd={addTemplate} onUpdate={updateTemplate} onDelete={deleteTemplate} />
 
-      {/* Modale confirmation finalisation */}
       <Dialog open={showFinalizeConfirm} onOpenChange={setShowFinalizeConfirm}>
         <DialogContent>
           <DialogHeader>
@@ -348,12 +407,9 @@ function App() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Annuler
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" />}>Annuler</DialogClose>
             <Button onClick={() => { setShowFinalizeConfirm(false); handleFinalize() }}>
-              <Download className="size-4 mr-1" />
-              Finaliser
+              <Download className="size-4 mr-1" />Finaliser
             </Button>
           </DialogFooter>
         </DialogContent>

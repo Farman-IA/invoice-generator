@@ -1,4 +1,4 @@
-import type { SavedInvoice, IssuerProfile, ClientRecord, ArticleTemplate } from '@/types/invoice'
+import type { SavedInvoice, SavedQuote, IssuerProfile, ClientRecord, ArticleTemplate } from '@/types/invoice'
 
 const KEYS = {
   INVOICES: 'invoices',
@@ -6,6 +6,8 @@ const KEYS = {
   ISSUER_PROFILE: 'issuer-profile',
   CLIENTS: 'clients',
   ARTICLE_TEMPLATES: 'articleTemplates',
+  QUOTES: 'quotes',
+  QUOTE_COUNTER: 'quote-counter',
   THEME: 'theme',
 } as const
 
@@ -54,6 +56,12 @@ export const storage = {
   // Modèles d'articles
   getArticleTemplates: () => get<ArticleTemplate[]>(KEYS.ARTICLE_TEMPLATES, []),
   saveArticleTemplates: (templates: ArticleTemplate[]) => set(KEYS.ARTICLE_TEMPLATES, templates),
+
+  // Devis
+  getQuotes: () => get<SavedQuote[]>(KEYS.QUOTES, []),
+  saveQuotes: (quotes: SavedQuote[]) => set(KEYS.QUOTES, quotes),
+  getQuoteCounter: () => get<number>(KEYS.QUOTE_COUNTER, 1),
+  saveQuoteCounter: (counter: number) => set(KEYS.QUOTE_COUNTER, counter),
 
   // Thème
   getTheme: () => get<'light' | 'dark'>(KEYS.THEME, 'light'),

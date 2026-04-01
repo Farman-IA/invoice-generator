@@ -7,26 +7,37 @@ import { ClientAutocomplete } from '@/components/ClientAutocomplete'
 import { LineItemsTable } from '@/components/LineItemsTable'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
 import { PLACEHOLDERS, LEGAL_MENTIONS } from '@/lib/constants'
-import type { IssuerProfile, ClientInfo, InvoiceData, LineItem, ArticleTemplate, ClientRecord } from '@/types/invoice'
+import type { IssuerProfile, ClientInfo, InvoiceData, QuoteData, LineItem, ArticleTemplate, ClientRecord } from '@/types/invoice'
+import { VALIDITY_OPTIONS } from '@/lib/constants'
 
-interface InvoiceDocumentProps {
+interface BaseDocumentProps {
   issuer: IssuerProfile
   client: ClientInfo
-  invoice: InvoiceData
   onUpdateIssuer: (partial: Partial<IssuerProfile>) => void
   onUpdateClient: (partial: Partial<ClientInfo>) => void
-  onUpdateInvoice: (partial: Partial<InvoiceData>) => void
   onAddLine: () => void
   onRemoveLine: (id: string) => void
   onUpdateLine: (id: string, partial: Partial<LineItem>) => void
-  // Clients autocomplete
   findClientByName?: (query: string) => ClientRecord[]
   onSelectClient?: (client: ClientInfo) => void
-  // Article templates
   templates?: ArticleTemplate[]
   onSaveAsTemplate?: (item: LineItem) => void
   onInsertTemplate?: (template: ArticleTemplate) => void
 }
+
+interface InvoiceMode extends BaseDocumentProps {
+  mode?: 'invoice'
+  invoice: InvoiceData
+  onUpdateInvoice: (partial: Partial<InvoiceData>) => void
+}
+
+interface QuoteMode extends BaseDocumentProps {
+  mode: 'quote'
+  invoice: QuoteData
+  onUpdateInvoice: (partial: Partial<QuoteData>) => void
+}
+
+type InvoiceDocumentProps = InvoiceMode | QuoteMode
 
 // F5 fix: extracted reusable component to eliminate 20+ duplicate patterns
 function LabeledField({
@@ -74,9 +85,12 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
       templates,
       onSaveAsTemplate,
       onInsertTemplate,
+      ...rest
     },
     ref
   ) {
+    const mode = ('mode' in rest && rest.mode === 'quote') ? 'quote' : 'invoice'
+    const isQuote = mode === 'quote'
     const logoInputRef = useRef<HTMLInputElement>(null)
     const totals = calculateTotals(invoice.items)
 
@@ -140,7 +154,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
 
           {/* Invoice title */}
           <div className="text-right">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">FACTURE</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">{isQuote ? 'DEVIS' : 'FACTURE'}</h1>
             <div className="space-y-0.5">
               <div className="flex items-center justify-end gap-2 text-sm">
                 <span className="text-gray-500">N°</span>
@@ -280,29 +294,54 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
 
         {/* ========== METADATA ========== */}
         <div className="flex flex-wrap gap-x-8 gap-y-1 mb-6 pb-4 border-b border-gray-200 text-xs">
-          <div className="flex gap-1 whitespace-nowrap">
-            <span className="text-gray-400">Date de livraison :</span>
-            <InlineEdit
-              value={invoice.deliveryDate}
-              onChange={(v) => onUpdateInvoice({ deliveryDate: v })}
-              as="date"
-              className="text-xs"
-            />
-          </div>
-          <div className="flex gap-1 whitespace-nowrap">
-            <span className="text-gray-400">Date d'échéance :</span>
-            <InlineEdit
-              value={invoice.dueDate}
-              onChange={(v) => onUpdateInvoice({ dueDate: v })}
-              as="date"
-              className="text-xs"
-            />
-          </div>
+          {isQuote ? (
+            <>
+              <div className="flex gap-1 whitespace-nowrap items-center">
+                <span className="text-gray-400">Validité :</span>
+                <select
+                  value={(invoice as QuoteData).validityDays}
+                  onChange={(e) => onUpdateInvoice({ validityDays: Number(e.target.value) } as never)}
+                  className="text-xs border-none bg-transparent cursor-pointer focus:outline-none"
+                >
+                  {VALIDITY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-1 whitespace-nowrap">
+                <span className="text-gray-400">Valable jusqu'au :</span>
+                <span className="font-medium">
+                  {new Date((invoice as QuoteData).validUntil).toLocaleDateString('fr-FR')}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex gap-1 whitespace-nowrap">
+                <span className="text-gray-400">Date de livraison :</span>
+                <InlineEdit
+                  value={(invoice as InvoiceData).deliveryDate}
+                  onChange={(v) => onUpdateInvoice({ deliveryDate: v } as never)}
+                  as="date"
+                  className="text-xs"
+                />
+              </div>
+              <div className="flex gap-1 whitespace-nowrap">
+                <span className="text-gray-400">Date d'échéance :</span>
+                <InlineEdit
+                  value={(invoice as InvoiceData).dueDate}
+                  onChange={(v) => onUpdateInvoice({ dueDate: v } as never)}
+                  as="date"
+                  className="text-xs"
+                />
+              </div>
+            </>
+          )}
           <div className="flex gap-1 whitespace-nowrap">
             <span className="text-gray-400">N° commande :</span>
             <InlineEdit
               value={invoice.purchaseOrder}
-              onChange={(v) => onUpdateInvoice({ purchaseOrder: v })}
+              onChange={(v) => onUpdateInvoice({ purchaseOrder: v } as never)}
               placeholder={PLACEHOLDERS.invoice.purchaseOrder}
               className="text-xs"
             />
@@ -347,17 +386,17 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               <span className="tabular-nums">{formatEuro(totals.totalTTC)} €</span>
             </div>
 
-            {/* Acompte */}
-            {invoice.deposit > 0 && (
+            {/* Acompte (factures uniquement) */}
+            {!isQuote && (invoice as InvoiceData).deposit > 0 && (
               <>
                 <div className="flex justify-between text-sm pt-1">
                   <span className="text-gray-500">Acompte versé</span>
-                  <span className="tabular-nums">− {formatEuro(invoice.deposit)} €</span>
+                  <span className="tabular-nums">− {formatEuro((invoice as InvoiceData).deposit)} €</span>
                 </div>
                 <div className="flex justify-between pt-1.5 border-t border-gray-800 text-base font-bold">
                   <span>Reste à payer</span>
                   <span className="tabular-nums">
-                    {formatEuro(Math.max(0, totals.totalTTC - invoice.deposit))} €
+                    {formatEuro(Math.max(0, totals.totalTTC - (invoice as InvoiceData).deposit))} €
                   </span>
                 </div>
               </>
@@ -365,48 +404,60 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           </div>
         </div>
 
-        {/* Saisie acompte (mode édition uniquement, caché en PDF) */}
-        <div className="mt-4 flex justify-end no-print-pdf">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Acompte versé :</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={invoice.deposit > 0 ? invoice.deposit : ''}
-              onChange={(e) => onUpdateInvoice({ deposit: Math.max(0, Number(e.target.value) || 0) })}
-              placeholder="0"
-              className="w-24 rounded-sm border border-gray-200 bg-white px-2 py-1 text-right text-sm outline-none focus:ring-1 focus:ring-blue-200"
-            />
-            <span>€</span>
+        {/* Saisie acompte (factures uniquement, caché en PDF) */}
+        {!isQuote && (
+          <div className="mt-4 flex justify-end no-print-pdf">
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>Acompte versé :</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={(invoice as InvoiceData).deposit > 0 ? (invoice as InvoiceData).deposit : ''}
+                onChange={(e) => onUpdateInvoice({ deposit: Math.max(0, Number(e.target.value) || 0) } as never)}
+                placeholder="0"
+                className="w-24 rounded-sm border border-gray-200 bg-white px-2 py-1 text-right text-sm outline-none focus:ring-1 focus:ring-blue-200"
+              />
+              <span>€</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ========== FOOTER ========== */}
         <div className="mt-12 pt-6 border-t border-gray-200 text-xs text-gray-500 space-y-4">
-          {/* Payment details */}
-          <div>
-            <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider mb-1">
-              Coordonnées bancaires
-            </h3>
-            <div className="space-y-0.5">
-              <LabeledField label="Banque" value={issuer.bankName} onChange={(v) => onUpdateIssuer({ bankName: v })} placeholder={PLACEHOLDERS.issuer.bankName} />
-              <LabeledField label="IBAN" value={issuer.iban} onChange={(v) => onUpdateIssuer({ iban: v })} placeholder={PLACEHOLDERS.issuer.iban} className="text-xs font-mono" />
-              <LabeledField label="BIC" value={issuer.bic} onChange={(v) => onUpdateIssuer({ bic: v })} placeholder={PLACEHOLDERS.issuer.bic} className="text-xs font-mono" />
+          {/* Coordonnées bancaires (factures uniquement) */}
+          {!isQuote && (
+            <div>
+              <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider mb-1">
+                Coordonnées bancaires
+              </h3>
+              <div className="space-y-0.5">
+                <LabeledField label="Banque" value={issuer.bankName} onChange={(v) => onUpdateIssuer({ bankName: v })} placeholder={PLACEHOLDERS.issuer.bankName} />
+                <LabeledField label="IBAN" value={issuer.iban} onChange={(v) => onUpdateIssuer({ iban: v })} placeholder={PLACEHOLDERS.issuer.iban} className="text-xs font-mono" />
+                <LabeledField label="BIC" value={issuer.bic} onChange={(v) => onUpdateIssuer({ bic: v })} placeholder={PLACEHOLDERS.issuer.bic} className="text-xs font-mono" />
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Payment terms */}
-          <div>
-            <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider mb-1">
-              Conditions de paiement
-            </h3>
-            <InlineEdit
-              value={invoice.paymentTerms}
-              onChange={(v) => onUpdateInvoice({ paymentTerms: v })}
-              className="text-xs"
-            />
-          </div>
+          {/* Conditions / Validité */}
+          {isQuote ? (
+            <div>
+              <p className="font-semibold text-gray-700 text-xs">
+                Devis valable jusqu'au {new Date((invoice as QuoteData).validUntil).toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider mb-1">
+                Conditions de paiement
+              </h3>
+              <InlineEdit
+                value={(invoice as InvoiceData).paymentTerms}
+                onChange={(v) => onUpdateInvoice({ paymentTerms: v } as never)}
+                className="text-xs"
+              />
+            </div>
+          )}
 
           {/* RC Pro */}
           {(issuer.rcProInsurer || issuer.rcProScope) && (
@@ -429,11 +480,13 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           )}
 
           {/* Legal mentions */}
-          <div className="text-[10px] text-gray-400 space-y-0.5 pt-2 border-t border-gray-100">
-            <p>{LEGAL_MENTIONS.latePaymentPenalty}</p>
-            <p>{LEGAL_MENTIONS.recoveryIndemnity}</p>
-            <p>{LEGAL_MENTIONS.noEarlyDiscount}</p>
-          </div>
+          {!isQuote && (
+            <div className="text-[10px] text-gray-400 space-y-0.5 pt-2 border-t border-gray-100">
+              <p>{LEGAL_MENTIONS.latePaymentPenalty}</p>
+              <p>{LEGAL_MENTIONS.recoveryIndemnity}</p>
+              <p>{LEGAL_MENTIONS.noEarlyDiscount}</p>
+            </div>
+          )}
 
           {/* Notes */}
           <div>
