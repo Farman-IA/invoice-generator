@@ -1,5 +1,5 @@
-import { useRef } from 'react'
-import { Plus, FileText, Save, Download, Sun, Moon, User, Users, Bookmark } from 'lucide-react'
+import { useRef, useEffect } from 'react'
+import { Plus, FileText, Save, Download, Sun, Moon, Settings, User, Users, Bookmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,19 @@ function App() {
   const [showProfile, setShowProfile] = useState(false)
   const [showClients, setShowClients] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showSettings) return
+    function handleClick(e: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowSettings(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showSettings])
 
   const handleDownloadPDF = async () => {
     if (!invoiceRef.current) return
@@ -138,10 +151,10 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
-      {/* Header unique */}
+      {/* Header */}
       <div className="no-print sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
-          {/* Navigation gauche */}
+          {/* Gauche : navigation */}
           <nav className="flex gap-1">
             <Button
               variant={view === 'EDIT' ? 'default' : 'ghost'}
@@ -166,8 +179,12 @@ function App() {
             </Button>
           </nav>
 
-          {/* Actions centrales (contextuelles) */}
-          <div className="flex-1 flex justify-center gap-2">
+          {/* Espace flexible */}
+          <div className="flex-1" />
+
+          {/* Droite : actions principales + réglages + thème */}
+          <div className="flex items-center gap-2">
+            {/* Actions contextuelles — toujours à droite, bien visibles */}
             {view === 'EDIT' && !isFinalized && (
               <>
                 <Button variant="outline" size="sm" onClick={handleSaveInvoice}>
@@ -186,25 +203,53 @@ function App() {
                 Télécharger PDF
               </Button>
             )}
-          </div>
 
-          {/* Outils droite */}
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="xs" onClick={() => setShowProfile(true)} className="text-gray-500 dark:text-gray-400">
-              <User className="size-3.5 mr-1" />
-              <span className="text-xs">Profil</span>
-            </Button>
-            <Button variant="ghost" size="xs" onClick={() => setShowClients(true)} className="text-gray-500 dark:text-gray-400">
-              <Users className="size-3.5 mr-1" />
-              <span className="text-xs">Clients</span>
-            </Button>
-            <Button variant="ghost" size="xs" onClick={() => setShowTemplates(true)} className="text-gray-500 dark:text-gray-400">
-              <Bookmark className="size-3.5 mr-1" />
-              <span className="text-xs">Modèles</span>
-            </Button>
-            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
-            <Button variant="ghost" size="icon-xs" onClick={toggleTheme} className="text-gray-500 dark:text-gray-400">
-              {theme === 'light' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
+            {/* Séparateur si des actions sont affichées */}
+            {view === 'EDIT' && (
+              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700" />
+            )}
+
+            {/* Menu réglages */}
+            <div className="relative" ref={settingsRef}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettings(s => !s)}
+                className="text-gray-500 dark:text-gray-400"
+              >
+                <Settings className="size-4 mr-1" />
+                Réglages
+              </Button>
+              {showSettings && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden z-50">
+                  <button
+                    onClick={() => { setShowProfile(true); setShowSettings(false) }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <User className="size-4 text-gray-400" />
+                    <span className="text-gray-700 dark:text-gray-200">Mon profil</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowClients(true); setShowSettings(false) }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
+                  >
+                    <Users className="size-4 text-gray-400" />
+                    <span className="text-gray-700 dark:text-gray-200">Carnet de clients</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowTemplates(true); setShowSettings(false) }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
+                  >
+                    <Bookmark className="size-4 text-gray-400" />
+                    <span className="text-gray-700 dark:text-gray-200">Modèles d'articles</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Thème */}
+            <Button variant="ghost" size="icon-sm" onClick={toggleTheme} className="text-gray-500 dark:text-gray-400">
+              {theme === 'light' ? <Moon className="size-4" /> : <Sun className="size-4" />}
             </Button>
           </div>
         </div>
