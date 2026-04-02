@@ -138,9 +138,9 @@ function formatError(err: unknown): string {
     return 'Trop de requêtes. Attendez quelques secondes.'
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed'))
     return 'Erreur réseau. Vérifiez votre connexion internet.'
-  if (msg.includes('404') || msg.includes('model'))
+  if (msg.includes('404') || msg.includes('model not found') || msg.includes('models/'))
     return 'Modèle IA non disponible. Essayez un autre modèle dans les réglages.'
-  return 'Erreur lors de l\'analyse. Réessayez.'
+  return `Erreur lors de l'analyse. Réessayez. (${msg.substring(0, 80)})`
 }
 
 export interface AIParseResult {
@@ -176,33 +176,21 @@ export function useAIParser() {
       const ai = new GoogleGenAI({ apiKey: currentSettings.apiKey })
       const priceMode = currentSettings.priceMode ?? 'ht'
 
-      // Construire l'historique de conversation pour Gemini
-      const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = []
+      // Construire le prompt avec contexte des messages precedents
+      let prompt = buildSystemPrompt(priceMode)
 
-      // Premier message : system prompt + premier message utilisateur si pas d'historique
-      if (history.length === 0) {
-        contents.push({ role: 'user', parts: [{ text: `${buildSystemPrompt(priceMode)}\n\nTexte :\n${text}` }] })
-      } else {
-        // Injecter le system prompt dans le premier message
-        const firstUserMsg = history.find(m => m.role === 'user')
-        for (const msg of history) {
-          if (msg.role === 'user') {
-            const isFirst = msg === firstUserMsg
-            contents.push({
-              role: 'user',
-              parts: [{ text: isFirst ? `${buildSystemPrompt(priceMode)}\n\nTexte :\n${msg.content}` : `Texte :\n${msg.content}` }],
-            })
-          } else {
-            contents.push({ role: 'model', parts: [{ text: msg.content }] })
-          }
-        }
-        // Ajouter le nouveau message
-        contents.push({ role: 'user', parts: [{ text: `Texte :\n${text}` }] })
+      if (history.length > 0) {
+        const contextLines = history.map(m =>
+          m.role === 'user' ? `Utilisateur : ${m.content}` : `Assistant : ${m.content}`
+        )
+        prompt += `\n\n## Historique de la conversation :\n${contextLines.join('\n')}`
       }
+
+      prompt += `\n\nNouveau message :\n${text}`
 
       const response = await ai.models.generateContent({
         model: currentSettings.model,
-        contents,
+        contents: prompt,
         config: {
           responseMimeType: 'application/json',
           responseSchema: buildInvoiceSchema(priceMode),
