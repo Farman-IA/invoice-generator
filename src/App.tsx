@@ -439,7 +439,7 @@ function App() {
         <div className="flex">
           {/* Chat IA — desktop sidebar */}
           <div className="hidden lg:block w-80 xl:w-96 flex-shrink-0 sticky top-[53px] h-[calc(100vh-53px)]">
-            <AIChatPanel open={true} onClose={() => {}} onApplyData={handleApplyAIData} />
+            <AIChatPanel open onClose={() => {}} onApplyData={handleApplyAIData} />
           </div>
 
           {/* Facture */}

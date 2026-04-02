@@ -14,6 +14,7 @@ export function AIChatBubble({ onClick, isOpen }: AIChatBubbleProps) {
       <Button
         size="icon-lg"
         onClick={onClick}
+        aria-label="Ouvrir l'assistant IA"
         className="rounded-full size-14 shadow-lg bg-blue-500 hover:bg-blue-600 text-white"
       >
         <Sparkles className="size-6" />

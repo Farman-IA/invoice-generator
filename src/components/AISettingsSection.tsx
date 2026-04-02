@@ -61,9 +61,10 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
       </h3>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Clé API Google</label>
+          <label htmlFor="ai-api-key" className="text-xs text-gray-500 dark:text-gray-400">Clé API Google</label>
           <div className="relative">
             <input
+              id="ai-api-key"
               type={showKey ? 'text' : 'password'}
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
@@ -83,8 +84,9 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
           </div>
         </div>
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Modèle IA</label>
+          <label htmlFor="ai-model" className="text-xs text-gray-500 dark:text-gray-400">Modèle IA</label>
           <select
+            id="ai-model"
             value={model}
             onChange={e => handleModelChange(e.target.value as AISettings['model'])}
             className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
@@ -95,13 +97,14 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
           </select>
         </div>
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Les montants que je dicte sont en</label>
-          <div className="flex gap-2 mt-1">
+          <label id="ai-price-mode" className="text-xs text-gray-500 dark:text-gray-400">Les montants que je dicte sont en</label>
+          <div role="group" aria-labelledby="ai-price-mode" className="flex gap-2 mt-1">
             {PRICE_MODES.map(mode => (
               <button
                 key={mode.value}
                 type="button"
                 onClick={() => handlePriceModeChange(mode.value)}
+                aria-pressed={priceMode === mode.value}
                 className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
                   priceMode === mode.value
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'

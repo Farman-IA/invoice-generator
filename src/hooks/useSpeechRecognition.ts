@@ -58,7 +58,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
   const onTranscriptRef = useRef(options.onTranscript)
   useEffect(() => {
     onTranscriptRef.current = options.onTranscript
-  })
+  }, [options.onTranscript])
 
   const createRecognition = useCallback(() => {
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition

@@ -105,13 +105,13 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
           <Sparkles className="size-4 text-blue-500" />
           <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Assistant IA</h2>
         </div>
-        <Button variant="ghost" size="icon-xs" onClick={onClose} className="lg:hidden">
+        <Button variant="ghost" size="icon-xs" onClick={onClose} className="lg:hidden" aria-label="Fermer le chat">
           <X className="size-4" />
         </Button>
       </div>
 
       {/* Messages */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${messages.length === 0 ? 'flex items-center justify-center' : ''}`}>
+      <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${messages.length === 0 ? 'flex items-center justify-center' : ''}`} role="log" aria-live="polite" aria-label="Messages de l'assistant IA">
         {messages.length === 0 && (
           <div className="text-center">
             <Sparkles className="size-8 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
@@ -169,6 +169,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
               onKeyDown={handleKeyDown}
               placeholder="Décrivez votre facture..."
               rows={1}
+              aria-label="Décrivez votre facture"
               className="flex-1 resize-none px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 max-h-24"
             />
             {speech.isSupported && (
@@ -177,11 +178,12 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
                 size="icon-sm"
                 onClick={toggleMic}
                 className={speech.isListening ? 'bg-red-500 hover:bg-red-600 text-white' : ''}
+                aria-label={speech.isListening ? 'Arrêter la dictée' : 'Activer la dictée vocale'}
               >
                 {speech.isListening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
               </Button>
             )}
-            <Button size="icon-sm" onClick={handleSubmit} disabled={!input.trim() || isLoading}>
+            <Button size="icon-sm" onClick={handleSubmit} disabled={!input.trim() || isLoading} aria-label="Envoyer">
               <Send className="size-4" />
             </Button>
           </div>
