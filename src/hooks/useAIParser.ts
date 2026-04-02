@@ -148,7 +148,7 @@ function formatError(err: unknown): string {
   if (msg.includes('api key') || msg.includes('401') || msg.includes('unauthorized'))
     return 'Clé API invalide. Vérifiez-la dans Réglages → Mon profil.'
   if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
-    return 'Trop de requêtes. Attendez quelques secondes.'
+    return 'Quota API dépassé. La clé gratuite Gemini est limitée à ~15 requêtes/min. Attendez 1-2 minutes avant de réessayer.'
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed'))
     return 'Erreur réseau. Vérifiez votre connexion internet.'
   if (msg.includes('404') || msg.includes('model not found') || msg.includes('models/'))

@@ -167,6 +167,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [retryCountdown, setRetryCountdown] = useState(0)
+  const retryAttemptRef = useRef(0)
   const { parse, isLoading, settings } = useAIParser()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -243,6 +244,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     const result = await parse(text, history)
 
     if (result.data) {
+      retryAttemptRef.current = 0
       // Afficher en mode prévisualisation — pas d'application immédiate
       const msgId = crypto.randomUUID()
       setMessages(prev => [...prev, {
@@ -252,11 +254,15 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
         pendingData: result.data!,
       }])
     } else if (result.message) {
+      retryAttemptRef.current = 0
       addMessage({ role: 'assistant', content: result.message })
     } else if (result.error) {
       addMessage({ role: 'error', content: result.error, isRetryable: result.isRetryable })
       if (result.isRetryable) {
-        setRetryCountdown(5)
+        retryAttemptRef.current += 1
+        // Délai croissant : 15s → 30s → 60s → 60s...
+        const delay = Math.min(60, 15 * Math.pow(2, retryAttemptRef.current - 1))
+        setRetryCountdown(delay)
       }
     }
   }
@@ -274,6 +280,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
         return prev
       })
       setRetryCountdown(0)
+      // Relancer — le compteur de tentatives continue pour augmenter le délai
       sendMessage(lastUserTextRef.current)
     }
   }
