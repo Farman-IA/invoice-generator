@@ -37,15 +37,15 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
 
   for (const [rate, baseHT] of vatMap.entries()) {
     const roundedBase = Math.round(baseHT * 100) / 100
-    const vatAmount = Math.ceil(roundedBase * (rate / 100) * 100) / 100
+    const vatAmount = Math.round(roundedBase * (rate / 100) * 100) / 100
     totalVAT += vatAmount
     vatBreakdown.push({ rate, baseHT: roundedBase, vatAmount })
   }
 
   vatBreakdown.sort((a, b) => a.rate - b.rate)
   totalVAT = Math.round(totalVAT * 100) / 100
-  // Arrondi du TTC au décime supérieur (usage commercial français)
-  const totalTTC = Math.ceil((totalHT + totalVAT) * 10) / 10
+  // Arrondi du TTC au centime le plus proche
+  const totalTTC = Math.round((totalHT + totalVAT) * 100) / 100
 
   return { totalHT, vatBreakdown, totalTTC, totalVAT }
 }

@@ -179,9 +179,9 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Décrivez votre facture..."
-              rows={1}
+              rows={3}
               aria-label="Décrivez votre facture"
-              className="flex-1 resize-none px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 max-h-24"
+              className="flex-1 resize-none px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 max-h-32"
             />
             {speech.isSupported && (
               <Button
