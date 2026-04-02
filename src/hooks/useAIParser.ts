@@ -8,6 +8,7 @@ const VALID_VAT_RATES: VatRate[] = [5.5, 10, 20]
 const INVOICE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
+    message: { type: Type.STRING, description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
     clientName: { type: Type.STRING, description: 'Nom du client ou de l\'entreprise' },
     purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande' },
     notes: { type: Type.STRING, description: 'Notes ou commentaires' },
@@ -25,21 +26,33 @@ const INVOICE_SCHEMA = {
       },
     },
   },
-  required: ['clientName', 'items'],
+  required: ['message'],
 }
 
-const SYSTEM_PROMPT = `Tu es un assistant qui extrait les données de factures depuis du texte français.
+const SYSTEM_PROMPT = `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
+## Quand le texte contient des données de facture :
 Extrait : clientName, purchaseOrder (si mentionné), notes (si mentionnées), et la liste des items (description, quantity, unitPrice HT, vatRate).
+Mets message à "" (vide).
 
-Règles TVA restauration France :
+## Quand le texte est une question ou une demande qui n'est PAS une description de facture :
+Réponds avec un message utile et amical dans le champ "message". Explique ce que tu peux faire.
+Ne remplis PAS clientName ni items.
+
+Exemples de questions → répondre avec message :
+- "Cherche l'adresse du client" → "Je ne peux pas chercher d'informations sur internet. Donnez-moi directement les données : nom du client, prestations, prix, et je remplirai la facture."
+- "Bonjour" → "Bonjour ! Décrivez-moi votre facture. Par exemple : « Facture pour Société X, 3 repas à 30€ et 1 location de salle à 500€ »"
+- "Comment ça marche ?" → "Décrivez votre facture en langage naturel et je remplirai automatiquement le client, les lignes et la TVA. Exemple : « 5 sandwichs à emporter à 8€ pour l'Université de Lorraine »"
+
+## Règles TVA restauration France :
 - 5.5 : alimentaire à emporter (sandwichs, plats à emporter)
 - 10 : restauration sur place (repas, boissons non alcoolisées sur place)
 - 20 : alcool (toujours), location de salle, prestations de service
 - En cas de doute : 20
 
-Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
-Les prix sont des nombres décimaux (30.00, pas "30 euros").`
+## Règles de formatage :
+- Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
+- Les prix sont des nombres décimaux (30.00, pas "30 euros").`
 
 function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1)
@@ -90,6 +103,11 @@ function formatError(err: unknown): string {
   return 'Erreur lors de l\'analyse. Réessayez.'
 }
 
+export interface AIParseResult {
+  data: ParsedInvoiceData | null
+  message: string | null
+}
+
 export function useAIParser() {
   const [settings, setSettings] = useState<AISettings | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -104,14 +122,13 @@ export function useAIParser() {
     await storage.saveAISettings(newSettings)
   }, [])
 
-  const parse = useCallback(async (text: string): Promise<ParsedInvoiceData | null> => {
-    // F4: toujours relire les settings depuis le storage pour éviter la désynchronisation
+  const parse = useCallback(async (text: string): Promise<AIParseResult> => {
     const currentSettings = await storage.getAISettings()
     if (currentSettings) setSettings(currentSettings)
 
     if (!currentSettings?.apiKey) {
       setError('Clé API manquante. Configurez-la dans Réglages → Mon profil.')
-      return null
+      return { data: null, message: null }
     }
 
     setIsLoading(true)
@@ -129,17 +146,23 @@ export function useAIParser() {
       })
 
       const raw = JSON.parse(response.text ?? '{}')
-      const parsed = validateParsedData(raw)
 
-      if (!parsed) {
-        setError('Aucune donnée exploitable trouvée. Reformulez votre description.')
-        return null
+      // Si l'IA a renvoyé un message conversationnel
+      const aiMessage = raw.message ? String(raw.message).trim() : null
+      if (aiMessage) {
+        return { data: null, message: aiMessage }
       }
 
-      return parsed
+      // Sinon, extraire les données de facture
+      const parsed = validateParsedData(raw)
+      if (!parsed) {
+        return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »' }
+      }
+
+      return { data: parsed, message: null }
     } catch (err) {
       setError(formatError(err))
-      return null
+      return { data: null, message: null }
     } finally {
       setIsLoading(false)
     }

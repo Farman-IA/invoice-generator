@@ -69,15 +69,22 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
 
     const result = await parse(text)
 
-    if (result) {
-      const summary = formatAppliedData(result)
+    if (result.data) {
+      const summary = formatAppliedData(result.data)
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: summary,
       }
       setMessages(prev => [...prev, assistantMsg])
-      onApplyData(result)
+      onApplyData(result.data)
+    } else if (result.message) {
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: result.message,
+      }
+      setMessages(prev => [...prev, assistantMsg])
     }
   }
 
