@@ -62,6 +62,13 @@ Exemples de questions → répondre avec message :
 - 20 : alcool (toujours), location de salle, prestations de service
 - En cas de doute : 20
 
+## Règles d'adressage (norme française La Poste) :
+- clientName : nom complet avec majuscules initiales (ex: "Mairie de Metz", "Université de Lorraine")
+- clientAddress : numéro + type de voie + nom de voie avec majuscules initiales (ex: "1 place d'Armes", "45 avenue de la République")
+- clientCity : ville en MAJUSCULES COMPLÈTES (ex: "METZ", "NANCY", "PARIS")
+- clientPostalCode : 5 chiffres (ex: "57000")
+- contactName : Prénom + NOM en majuscules (ex: "Jean DUPONT", "Marie MARTIN")
+
 ## Règles de formatage :
 - Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 - Les prix sont des nombres décimaux (30.00, pas "30 euros").`
@@ -107,7 +114,7 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
     clientName: String(raw.clientName ?? ''),
     clientAddress: raw.clientAddress ? String(raw.clientAddress) : undefined,
     clientPostalCode: raw.clientPostalCode ? String(raw.clientPostalCode) : undefined,
-    clientCity: raw.clientCity ? String(raw.clientCity) : undefined,
+    clientCity: raw.clientCity ? String(raw.clientCity).toUpperCase() : undefined,
     contactName: raw.contactName ? String(raw.contactName) : undefined,
     purchaseOrder: raw.purchaseOrder ? String(raw.purchaseOrder) : undefined,
     notes: raw.notes ? String(raw.notes) : undefined,
