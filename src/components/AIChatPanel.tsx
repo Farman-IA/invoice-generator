@@ -305,7 +305,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-blue-500" />
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Assistant Facture</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Assistant Facture et Devis</h2>
         </div>
         <Button variant="ghost" size="icon-xs" onClick={onClose} className="lg:hidden" aria-label="Fermer le chat">
           <X className="size-4" />
