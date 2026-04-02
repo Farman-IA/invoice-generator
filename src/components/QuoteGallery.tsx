@@ -112,7 +112,7 @@ export function QuoteGallery({
               <div key={quote.id} className="group flex flex-col">
                 {/* Miniature */}
                 <div
-                  className="relative cursor-pointer rounded-xl overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ring-1 ring-gray-200/80 dark:ring-gray-700/80 hover:ring-violet-300 dark:hover:ring-violet-600"
+                  className="relative cursor-pointer rounded-xl overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ring-1 ring-gray-200/80 dark:ring-gray-700/80 hover:ring-gray-400 dark:hover:ring-gray-500"
                   onClick={() => onEdit(quote.id)}
                   title="Charger ce devis"
                 >

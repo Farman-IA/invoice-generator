@@ -178,7 +178,7 @@ export function InvoiceGallery({
               <div key={invoice.id} className="group flex flex-col">
                 {/* Miniature */}
                 <div
-                  className="relative cursor-pointer rounded-xl overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ring-1 ring-gray-200/80 dark:ring-gray-700/80 hover:ring-blue-300 dark:hover:ring-blue-600"
+                  className="relative cursor-pointer rounded-xl overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ring-1 ring-gray-200/80 dark:ring-gray-700/80 hover:ring-gray-400 dark:hover:ring-gray-500"
                   onClick={() => onEdit(invoice.id)}
                   title="Charger cette facture"
                 >
