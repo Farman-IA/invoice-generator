@@ -59,6 +59,14 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     }
   }, [open])
 
+  // Auto-resize du textarea (fonctionne aussi en dictée vocale)
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto'
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 160) + 'px'
+    }
+  }, [input])
+
   const addMessage = (role: ChatMessage['role'], content: string) => {
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role, content }])
   }
@@ -177,12 +185,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
             <textarea
               ref={inputRef}
               value={input}
-              onChange={e => {
-                setInput(e.target.value)
-                // Auto-resize
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
-              }}
+              onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Décrivez votre facture..."
               rows={2}
