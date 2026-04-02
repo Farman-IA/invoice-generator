@@ -69,15 +69,28 @@ Exemples de questions → répondre avec message :
 - En cas de doute : 20
 
 ## Règles d'adressage (norme française La Poste) :
-- clientName : nom complet avec majuscules initiales (ex: "Mairie de Metz", "Université de Lorraine")
-- clientAddress : numéro + type de voie + nom de voie avec majuscules initiales (ex: "1 place d'Armes", "45 avenue de la République")
-- clientCity : ville en MAJUSCULES COMPLÈTES (ex: "METZ", "NANCY", "PARIS")
-- clientPostalCode : 5 chiffres (ex: "57000")
-- contactName : Prénom + NOM en majuscules (ex: "Jean DUPONT", "Marie MARTIN")
+- clientName : nom complet de l'entreprise ou du particulier avec majuscules initiales (ex: "Mairie de Metz", "Université de Lorraine", "Adele Suty")
+- clientAddress : numéro + type de voie + nom de voie avec majuscules initiales (ex: "1 place d'Armes", "3 rue du Golf")
+- clientCity : ville en MAJUSCULES COMPLÈTES (ex: "METZ", "AINGERAY", "NANCY"). ATTENTION : ne JAMAIS confondre la ville avec le nom du client ou d'autres champs.
+- clientPostalCode : 5 chiffres (ex: "57000", "54460"). Si le code postal n'est pas fourni, laisser vide.
+- contactName : Prénom + NOM en majuscules (ex: "Jean DUPONT", "Marie MARTIN"). Si le nom du contact et le nom du client sont la même personne, remplir les DEUX champs avec le même nom.
+
+## ATTENTION — Erreurs fréquentes à éviter :
+- Ne PAS inventer de code postal s'il n'est pas dans le texte
+- Ne PAS mélanger les champs : le nom du client va dans clientName, la rue dans clientAddress, la ville dans clientCity
+- Ne PAS couper ou déformer les noms propres (ex: "Aingeray" ne doit PAS devenir "INGE R A I")
+- Si le texte est ambigu, préférer laisser un champ vide plutôt qu'inventer une valeur fausse
+- Bien séparer nom du client, adresse, ville : ce sont des informations distinctes
 
 ## Règles de formatage :
 - Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
-- Les prix sont des nombres décimaux (30.00, pas "30 euros").`
+- Les prix sont des nombres décimaux (30.00, pas "30 euros").
+
+## Exemples complets de parsing :
+- "Facture pour Adele Suty, 3 rue du Golf, Aingeray, 1 repas à 30€ et 2 bouteilles de vin à 25€" →
+  clientName: "Adele Suty", clientAddress: "3 rue du Golf", clientCity: "AINGERAY", contactName: "Adele SUTY", items: [{description: "Repas", quantity: 1, unitPrice: 30, vatRate: 10}, {description: "Bouteille de vin", quantity: 2, unitPrice: 25, vatRate: 20}]
+- "308 sandwichs à 8€ pour l'Université de Lorraine" →
+  clientName: "Université de Lorraine", items: [{description: "Sandwich", quantity: 308, unitPrice: 8, vatRate: 5.5}]`
 }
 
 function capitalize(str: string): string {
@@ -147,6 +160,7 @@ export interface AIParseResult {
   data: ParsedInvoiceData | null
   message: string | null
   error: string | null
+  isRetryable: boolean
 }
 
 export function useAIParser() {
@@ -167,7 +181,7 @@ export function useAIParser() {
     if (currentSettings) setSettings(currentSettings)
 
     if (!currentSettings?.apiKey) {
-      return { data: null, message: null, error: 'Clé API manquante. Configurez-la dans Réglages → Mon profil.' }
+      return { data: null, message: null, error: 'Clé API manquante. Configurez-la dans Réglages → Mon profil.', isRetryable: false }
     }
 
     setIsLoading(true)
@@ -202,18 +216,20 @@ export function useAIParser() {
       // Si l'IA a renvoyé un message conversationnel
       const aiMessage = raw.message ? String(raw.message).trim() : null
       if (aiMessage) {
-        return { data: null, message: aiMessage, error: null }
+        return { data: null, message: aiMessage, error: null, isRetryable: false }
       }
 
       // Sinon, extraire les données de facture
       const parsed = validateParsedData(raw, priceMode)
       if (!parsed) {
-        return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null }
+        return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null, isRetryable: false }
       }
 
-      return { data: parsed, message: null, error: null }
+      return { data: parsed, message: null, error: null, isRetryable: false }
     } catch (err) {
-      return { data: null, message: null, error: formatError(err) }
+      const errorMsg = formatError(err)
+      const isRetryable = err instanceof Error && /429|rate|quota|network|fetch|failed/i.test(err.message)
+      return { data: null, message: null, error: errorMsg, isRetryable }
     } finally {
       setIsLoading(false)
     }
