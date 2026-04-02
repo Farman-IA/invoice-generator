@@ -100,7 +100,7 @@ export function QuoteGallery({
           {!search && statusFilter === 'tous' && <p className="text-sm mt-1">Créez votre premier devis !</p>}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {sorted.map(quote => {
             const totals = calculateTotals(quote.quote.items)
             const date = new Date(quote.quote.issueDate).toLocaleDateString('fr-FR')

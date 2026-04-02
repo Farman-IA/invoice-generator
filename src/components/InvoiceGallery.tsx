@@ -168,7 +168,7 @@ export function InvoiceGallery({
           {!hasFilters && <p className="text-sm mt-1">Créez votre première !</p>}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {sorted.map(invoice => {
             const totals = calculateTotals(invoice.invoice.items)
             const date = new Date(invoice.invoice.issueDate).toLocaleDateString('fr-FR')
