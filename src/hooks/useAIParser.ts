@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GoogleGenAI, Type } from '@google/genai'
 import { storage } from '@/lib/storage'
-import type { AISettings, ParsedInvoiceData, VatRate } from '@/types/invoice'
+import type { AISettings, ParsedInvoiceData, VatRate, PriceMode } from '@/types/invoice'
 
 const VALID_VAT_RATES: VatRate[] = [5.5, 10, 20]
 
@@ -29,11 +29,19 @@ const INVOICE_SCHEMA = {
   required: ['message'],
 }
 
-const SYSTEM_PROMPT = `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
+function buildSystemPrompt(priceMode: PriceMode): string {
+  const priceInstruction = priceMode === 'ttc'
+    ? `IMPORTANT : Les montants donnés par l'utilisateur sont en TTC (toutes taxes comprises).
+Tu dois quand même les mettre TELS QUELS dans unitPrice. La conversion TTC→HT sera faite automatiquement après.`
+    : `Les montants donnés par l'utilisateur sont en HT (hors taxe). Mets-les directement dans unitPrice.`
+
+  return `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
 ## Quand le texte contient des données de facture :
-Extrait : clientName, purchaseOrder (si mentionné), notes (si mentionnées), et la liste des items (description, quantity, unitPrice HT, vatRate).
+Extrait : clientName, purchaseOrder (si mentionné), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
 Mets message à "" (vide).
+
+${priceInstruction}
 
 ## Quand le texte est une question ou une demande qui n'est PAS une description de facture :
 Réponds avec un message utile et amical dans le champ "message". Explique ce que tu peux faire.
@@ -53,6 +61,7 @@ Exemples de questions → répondre avec message :
 ## Règles de formatage :
 - Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 - Les prix sont des nombres décimaux (30.00, pas "30 euros").`
+}
 
 function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1)
@@ -63,7 +72,11 @@ function sanitizeVatRate(rate: number): VatRate {
   return 20
 }
 
-function validateParsedData(raw: Record<string, unknown>): ParsedInvoiceData | null {
+function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
+  return Math.round((priceTtc / (1 + vatRate / 100)) * 100) / 100
+}
+
+function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {
   if (!raw.clientName && (!Array.isArray(raw.items) || raw.items.length === 0)) {
     return null
   }
@@ -73,12 +86,17 @@ function validateParsedData(raw: Record<string, unknown>): ParsedInvoiceData | n
         .filter((item: Record<string, unknown>) =>
           item && typeof item.description === 'string' && item.description.trim() !== ''
         )
-        .map((item: Record<string, unknown>) => ({
-          description: capitalize(String(item.description)),
-          quantity: Math.max(1, Number(item.quantity) || 1),
-          unitPrice: Math.max(0, Number(item.unitPrice) || 0),
-          vatRate: sanitizeVatRate(Number(item.vatRate)),
-        }))
+        .map((item: Record<string, unknown>) => {
+          const vatRate = sanitizeVatRate(Number(item.vatRate))
+          const rawPrice = Math.max(0, Number(item.unitPrice) || 0)
+          const unitPrice = priceMode === 'ttc' ? convertTtcToHt(rawPrice, vatRate) : rawPrice
+          return {
+            description: capitalize(String(item.description)),
+            quantity: Math.max(1, Number(item.quantity) || 1),
+            unitPrice,
+            vatRate,
+          }
+        })
     : []
 
   return {
@@ -134,9 +152,10 @@ export function useAIParser() {
 
     try {
       const ai = new GoogleGenAI({ apiKey: currentSettings.apiKey })
+      const priceMode = currentSettings.priceMode ?? 'ht'
       const response = await ai.models.generateContent({
         model: currentSettings.model,
-        contents: `${SYSTEM_PROMPT}\n\nTexte :\n${text}`,
+        contents: `${buildSystemPrompt(priceMode)}\n\nTexte :\n${text}`,
         config: {
           responseMimeType: 'application/json',
           responseSchema: INVOICE_SCHEMA,
@@ -152,7 +171,7 @@ export function useAIParser() {
       }
 
       // Sinon, extraire les données de facture
-      const parsed = validateParsedData(raw)
+      const parsed = validateParsedData(raw, priceMode)
       if (!parsed) {
         return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null }
       }

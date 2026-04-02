@@ -118,9 +118,12 @@ export interface ArticleTemplate {
   vatRate: VatRate
 }
 
+export type PriceMode = 'ht' | 'ttc'
+
 export interface AISettings {
   apiKey: string
   model: 'gemini-2.5-flash' | 'gemini-2.5-pro'
+  priceMode: PriceMode
 }
 
 export interface ParsedInvoiceData {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { storage } from '@/lib/storage'
-import type { AISettings } from '@/types/invoice'
+import type { AISettings, PriceMode } from '@/types/invoice'
 
 interface AISettingsSectionProps {
   onSettingsChange?: (settings: AISettings) => void
@@ -13,9 +13,15 @@ const MODELS: { value: AISettings['model']; label: string }[] = [
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (plus précis)' },
 ]
 
+const PRICE_MODES: { value: PriceMode; label: string; description: string }[] = [
+  { value: 'ht', label: 'HT (hors taxe)', description: 'Les montants dictés sont déjà hors taxe' },
+  { value: 'ttc', label: 'TTC (toutes taxes)', description: 'Les montants dictés incluent la TVA — conversion auto' },
+]
+
 export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) {
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState<AISettings['model']>('gemini-2.5-flash')
+  const [priceMode, setPriceMode] = useState<PriceMode>('ht')
   const [showKey, setShowKey] = useState(false)
 
   useEffect(() => {
@@ -23,23 +29,29 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
       if (settings) {
         setApiKey(settings.apiKey)
         setModel(settings.model)
+        setPriceMode(settings.priceMode ?? 'ht')
       }
     })
   }, [])
 
-  const saveSettings = (key: string, mod: AISettings['model']) => {
-    const newSettings: AISettings = { apiKey: key, model: mod }
+  const save = (key: string, mod: AISettings['model'], price: PriceMode) => {
+    const newSettings: AISettings = { apiKey: key, model: mod, priceMode: price }
     storage.saveAISettings(newSettings)
     onSettingsChange?.(newSettings)
   }
 
   const handleApiKeyBlur = () => {
-    saveSettings(apiKey, model)
+    save(apiKey, model, priceMode)
   }
 
   const handleModelChange = (value: AISettings['model']) => {
     setModel(value)
-    saveSettings(apiKey, value)
+    save(apiKey, value, priceMode)
+  }
+
+  const handlePriceModeChange = (value: PriceMode) => {
+    setPriceMode(value)
+    save(apiKey, model, value)
   }
 
   return (
@@ -81,6 +93,28 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
           </select>
+        </div>
+        <div className="col-span-2">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Les montants que je dicte sont en</label>
+          <div className="flex gap-2 mt-1">
+            {PRICE_MODES.map(mode => (
+              <button
+                key={mode.value}
+                type="button"
+                onClick={() => handlePriceModeChange(mode.value)}
+                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                  priceMode === mode.value
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+            {PRICE_MODES.find(m => m.value === priceMode)?.description}
+          </p>
         </div>
       </div>
     </div>
