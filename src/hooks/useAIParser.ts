@@ -125,6 +125,7 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
             description: capitalize(String(item.description)),
             quantity: Math.max(1, Number(item.quantity) || 1),
             unitPrice,
+            ...(priceMode === 'ttc' ? { unitPriceTTC: rawPrice } : {}),
             vatRate,
           }
         })

@@ -5,6 +5,7 @@ export interface LineItem {
   description: string
   quantity: number
   unitPrice: number
+  unitPriceTTC?: number
   vatRate: VatRate
 }
 
@@ -137,6 +138,7 @@ export interface ParsedInvoiceData {
     description: string
     quantity: number
     unitPrice: number
+    unitPriceTTC?: number
     vatRate: VatRate
   }[]
 }

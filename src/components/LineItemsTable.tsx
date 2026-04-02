@@ -65,7 +65,11 @@ export function LineItemsTable({
         </thead>
         <tbody>
           {items.map((item) => {
-            const lineTotal = calculateLineTotal(item.quantity, item.unitPrice)
+            const isTTC = item.unitPriceTTC != null && item.unitPriceTTC > 0
+            const lineTTC = isTTC ? Math.round(item.quantity * item.unitPriceTTC! * 100) / 100 : 0
+            const lineTotal = isTTC
+              ? Math.round(lineTTC / (1 + item.vatRate / 100) * 100) / 100
+              : calculateLineTotal(item.quantity, item.unitPrice)
             return (
               <tr
                 key={item.id}
@@ -91,7 +95,11 @@ export function LineItemsTable({
                 <td className="py-2.5 px-2 text-right">
                   <InlineEdit
                     value={String(Math.round(item.unitPrice * 100) / 100)}
-                    onChange={(v) => onUpdate(item.id, { unitPrice: Math.max(0, Number(v) || 0) })}
+                    onChange={(v) => {
+                      const newHT = Math.max(0, Number(v) || 0)
+                      // Si l'utilisateur modifie le prix HT manuellement, on supprime le lien TTC
+                      onUpdate(item.id, { unitPrice: newHT, unitPriceTTC: undefined })
+                    }}
                     as="number"
                     className="text-right w-full"
                   />

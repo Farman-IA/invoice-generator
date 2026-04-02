@@ -227,6 +227,7 @@ function App() {
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          ...(item.unitPriceTTC != null ? { unitPriceTTC: item.unitPriceTTC } : {}),
           vatRate: item.vatRate,
         }))
         inv.updateInvoice({ items: newItems })
