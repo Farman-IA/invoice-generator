@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Edit, Copy, Trash2, Download, FileText, ArrowRight, Search, X, Send, Check, XCircle } from 'lucide-react'
+import { Copy, Trash2, Download, FileText, ArrowRight, Search, X, Send, Check, XCircle, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -11,8 +11,9 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
+import { DocumentThumbnail } from '@/components/DocumentThumbnail'
 import type { SavedQuote, QuoteStatus } from '@/types/invoice'
-import { calculateTotals, formatEuro } from '@/lib/calculations'
+import { calculateTotals } from '@/lib/calculations'
 
 const STATUS_BADGE: Record<QuoteStatus, { label: string; className: string }> = {
   brouillon: { label: 'Brouillon', className: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' },
@@ -99,7 +100,7 @@ export function QuoteGallery({
           {!search && statusFilter === 'tous' && <p className="text-sm mt-1">Créez votre premier devis !</p>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {sorted.map(quote => {
             const totals = calculateTotals(quote.quote.items)
             const date = new Date(quote.quote.issueDate).toLocaleDateString('fr-FR')
@@ -108,73 +109,91 @@ export function QuoteGallery({
             const badge = STATUS_BADGE[quote.status]
 
             return (
-              <div
-                key={quote.id}
-                className="group bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col gap-3"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{quote.quote.number}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{quote.client.companyName || 'Client non renseigné'}</p>
+              <div key={quote.id} className="group flex flex-col">
+                {/* Miniature */}
+                <div
+                  className="relative cursor-pointer rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-shadow ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-blue-300 dark:hover:ring-blue-700"
+                  onClick={() => onEdit(quote.id)}
+                  title="Charger ce devis"
+                >
+                  <DocumentThumbnail
+                    type="devis"
+                    number={quote.quote.number}
+                    clientName={quote.client.companyName}
+                    issuerName={quote.issuer.companyName}
+                    totalTTC={totals.totalTTC}
+                    itemCount={quote.quote.items.length}
+                  />
+
+                  {/* Badge statut */}
+                  <div className="absolute top-1.5 right-1.5">
+                    <Badge variant="outline" className={`text-[9px] px-1 py-0 ${badge.className}`}>
+                      {badge.label}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className={badge.className}>{badge.label}</Badge>
+
+                  {/* Indicateur converti */}
+                  {quote.linkedInvoiceId && (
+                    <div className="absolute bottom-1.5 left-1.5">
+                      <Badge className="text-[8px] px-1 py-0 bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        Facturé
+                      </Badge>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatEuro(totals.totalTTC)} €</span>
-                  <span className="text-xs text-gray-400">{date}</span>
+                {/* Infos sous la miniature */}
+                <div className="mt-2 px-0.5">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">{quote.quote.number}</p>
+                  <p className="text-[10px] text-gray-400">{date}</p>
                 </div>
-
-                {quote.linkedInvoiceId && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Converti en facture</p>
-                )}
 
                 {/* Actions */}
-                <div className="flex gap-1 pt-1 border-t border-gray-100 dark:border-gray-800 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                  {isBrouillon && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onEdit(quote.id)} title="Éditer" aria-label="Éditer le devis">
-                      <Edit className="size-3.5" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon-sm" onClick={() => onDuplicate(quote.id)} title="Dupliquer" aria-label="Dupliquer le devis">
-                    <Copy className="size-3.5" />
+                <div className="flex items-center gap-0.5 mt-1.5">
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onEdit(quote.id)}>
+                    <FolderOpen className="size-3 mr-0.5" />
+                    Charger
                   </Button>
-                  <Button variant="ghost" size="icon-sm" onClick={() => onDownload(quote.id)} title="Télécharger PDF" aria-label="Télécharger PDF">
-                    <Download className="size-3.5" />
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onDuplicate(quote.id)}>
+                    <Copy className="size-3 mr-0.5" />
+                    Dupliquer
+                  </Button>
+                  <Button variant="ghost" size="icon-xs" onClick={() => onDownload(quote.id)} title="PDF" aria-label="Télécharger PDF">
+                    <Download className="size-3" />
                   </Button>
 
-                  {/* Changement de statut */}
+                  {/* Statut */}
                   {isBrouillon && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'envoyé')} title="Marquer envoyé" aria-label="Marquer envoyé" className="text-blue-500">
-                      <Send className="size-3.5" />
+                    <Button variant="ghost" size="icon-xs" onClick={() => onUpdateStatus(quote.id, 'envoyé')} title="Envoyé" aria-label="Marquer envoyé" className="text-blue-500">
+                      <Send className="size-3" />
                     </Button>
                   )}
                   {quote.status === 'envoyé' && (
                     <>
-                      <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'accepté')} title="Accepté" aria-label="Marquer accepté" className="text-emerald-500">
-                        <Check className="size-3.5" />
+                      <Button variant="ghost" size="icon-xs" onClick={() => onUpdateStatus(quote.id, 'accepté')} title="Accepté" aria-label="Accepté" className="text-emerald-500">
+                        <Check className="size-3" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'refusé')} title="Refusé" aria-label="Marquer refusé" className="text-red-500">
-                        <XCircle className="size-3.5" />
+                      <Button variant="ghost" size="icon-xs" onClick={() => onUpdateStatus(quote.id, 'refusé')} title="Refusé" aria-label="Refusé" className="text-red-500">
+                        <XCircle className="size-3" />
                       </Button>
                     </>
                   )}
 
-                  {/* Convertir en facture */}
+                  {/* Convertir */}
                   {isAccepted && !quote.linkedInvoiceId && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onConvertToInvoice(quote.id)} title="Convertir en facture" aria-label="Convertir en facture" className="text-emerald-600">
-                      <ArrowRight className="size-3.5" />
+                    <Button variant="ghost" size="icon-xs" onClick={() => onConvertToInvoice(quote.id)} title="Convertir en facture" aria-label="Convertir en facture" className="text-emerald-600">
+                      <ArrowRight className="size-3" />
                     </Button>
                   )}
 
                   <Button
-                    variant="ghost" size="icon-sm"
-                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus-visible:bg-red-50 dark:focus-visible:bg-red-900/20"
+                    variant="ghost" size="icon-xs"
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     onClick={() => setDeleteTarget(quote)}
                     title="Supprimer"
                     aria-label="Supprimer le devis"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-3" />
                   </Button>
                 </div>
               </div>

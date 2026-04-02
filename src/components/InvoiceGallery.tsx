@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Edit, Copy, Trash2, Download, FileText, CheckCircle, Search, X, ArrowUpDown, SlidersHorizontal, AlertTriangle } from 'lucide-react'
+import { Copy, Trash2, Download, FileText, CheckCircle, Search, X, ArrowUpDown, SlidersHorizontal, AlertTriangle, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
+import { DocumentThumbnail } from '@/components/DocumentThumbnail'
 import type { SavedInvoice, PaymentStatus } from '@/types/invoice'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
 
@@ -44,7 +45,6 @@ export function InvoiceGallery({
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [showFilters, setShowFilters] = useState(false)
 
-  // Filtrage et tri avec useMemo pour éviter les recalculs
   const sorted = useMemo(() => {
     let filtered = invoices
 
@@ -65,7 +65,6 @@ export function InvoiceGallery({
       filtered = filtered.filter(inv => inv.paymentStatus === paymentFilter)
     }
 
-    // Tri
     return [...filtered].sort((a, b) => {
       switch (sortKey) {
         case 'date': return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -107,16 +106,14 @@ export function InvoiceGallery({
             <SlidersHorizontal className="size-4 mr-1" />
             Filtres
           </Button>
-          <div className="relative">
-            <Button variant="outline" size="sm" onClick={() => {
-              const keys: SortKey[] = ['date', 'date_asc', 'montant', 'montant_asc', 'client']
-              const idx = keys.indexOf(sortKey)
-              setSortKey(keys[(idx + 1) % keys.length])
-            }}>
-              <ArrowUpDown className="size-4 mr-1" />
-              {sortKey === 'date' ? 'Récent' : sortKey === 'date_asc' ? 'Ancien' : sortKey === 'montant' ? '€ ↓' : sortKey === 'montant_asc' ? '€ ↑' : 'A-Z'}
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => {
+            const keys: SortKey[] = ['date', 'date_asc', 'montant', 'montant_asc', 'client']
+            const idx = keys.indexOf(sortKey)
+            setSortKey(keys[(idx + 1) % keys.length])
+          }}>
+            <ArrowUpDown className="size-4 mr-1" />
+            {sortKey === 'date' ? 'Récent' : sortKey === 'date_asc' ? 'Ancien' : sortKey === 'montant' ? '€ ↓' : sortKey === 'montant_asc' ? '€ ↑' : 'A-Z'}
+          </Button>
         </div>
 
         {showFilters && (
@@ -140,12 +137,11 @@ export function InvoiceGallery({
           </div>
         )}
 
-        {/* Filtres actifs */}
         {hasFilters && (
           <div className="flex flex-wrap gap-1">
             {search && (
               <Badge variant="secondary" className="cursor-pointer" onClick={() => setSearch('')}>
-                Recherche: "{search}" <X className="size-3 ml-1" />
+                Recherche: &quot;{search}&quot; <X className="size-3 ml-1" />
               </Badge>
             )}
             {statusFilter !== 'tous' && (
@@ -172,89 +168,89 @@ export function InvoiceGallery({
           {!hasFilters && <p className="text-sm mt-1">Créez votre première !</p>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {sorted.map(invoice => {
             const totals = calculateTotals(invoice.invoice.items)
             const date = new Date(invoice.invoice.issueDate).toLocaleDateString('fr-FR')
             const isBrouillon = invoice.status === 'brouillon'
 
             return (
-              <div
-                key={invoice.id}
-                className="group bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col gap-3"
-              >
-                {/* En-tête carte */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
-                      {invoice.invoice.number}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {invoice.client.companyName || 'Client non renseigné'}
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-1 items-end shrink-0">
+              <div key={invoice.id} className="group flex flex-col">
+                {/* Miniature */}
+                <div
+                  className="relative cursor-pointer rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-shadow ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-blue-300 dark:hover:ring-blue-700"
+                  onClick={() => onEdit(invoice.id)}
+                  title="Charger cette facture"
+                >
+                  <DocumentThumbnail
+                    type="facture"
+                    number={invoice.invoice.number}
+                    clientName={invoice.client.companyName}
+                    issuerName={invoice.issuer.companyName}
+                    totalTTC={totals.totalTTC}
+                    itemCount={invoice.invoice.items.length}
+                  />
+
+                  {/* Overlay badges */}
+                  <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
                     <Badge
                       variant={isBrouillon ? 'secondary' : 'default'}
-                      className={
+                      className={`text-[9px] px-1 py-0 ${
                         isBrouillon
-                          ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
-                          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                      }
+                          ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400'
+                          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      }`}
                     >
                       {invoice.status}
                     </Badge>
                     {!isBrouillon && invoice.paymentStatus && (
-                      <Badge variant="outline" className={PAYMENT_BADGE[invoice.paymentStatus].className}>
-                        {invoice.paymentStatus === 'en_retard' && <AlertTriangle className="size-3 mr-0.5" />}
+                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${PAYMENT_BADGE[invoice.paymentStatus].className}`}>
+                        {invoice.paymentStatus === 'en_retard' && <AlertTriangle className="size-2.5 mr-0.5" />}
                         {PAYMENT_BADGE[invoice.paymentStatus].label}
                       </Badge>
                     )}
                   </div>
                 </div>
 
-                {/* Montant + date */}
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    {formatEuro(totals.totalTTC)} €
-                  </span>
-                  <span className="text-xs text-gray-400">{date}</span>
+                {/* Infos sous la miniature */}
+                <div className="mt-2 px-0.5">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">{invoice.invoice.number}</p>
+                  <p className="text-[10px] text-gray-400">{date}</p>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-1 pt-1 border-t border-gray-100 dark:border-gray-800 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                  {isBrouillon && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onEdit(invoice.id)} title="Éditer" aria-label="Éditer la facture">
-                      <Edit className="size-3.5" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon-sm" onClick={() => onDuplicate(invoice.id)} title="Dupliquer" aria-label="Dupliquer la facture">
-                    <Copy className="size-3.5" />
+                <div className="flex items-center gap-0.5 mt-1.5">
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onEdit(invoice.id)}>
+                    <FolderOpen className="size-3 mr-0.5" />
+                    Charger
+                  </Button>
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onDuplicate(invoice.id)}>
+                    <Copy className="size-3 mr-0.5" />
+                    Dupliquer
                   </Button>
                   {!isBrouillon && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onDownload(invoice.id)} title="Télécharger PDF" aria-label="Télécharger PDF">
-                      <Download className="size-3.5" />
+                    <Button variant="ghost" size="icon-xs" onClick={() => onDownload(invoice.id)} title="PDF" aria-label="Télécharger PDF">
+                      <Download className="size-3" />
                     </Button>
                   )}
                   {!isBrouillon && invoice.paymentStatus !== 'payee' && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onMarkPaid(invoice.id)} title="Marquer comme payée" aria-label="Marquer la facture comme payée" className="text-emerald-500 hover:text-emerald-700">
-                      <CheckCircle className="size-3.5" />
+                    <Button variant="ghost" size="icon-xs" onClick={() => onMarkPaid(invoice.id)} title="Payée" aria-label="Marquer payée" className="text-emerald-500">
+                      <CheckCircle className="size-3" />
                     </Button>
                   )}
                   {!isBrouillon && invoice.paymentStatus === 'payee' && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onMarkUnpaid(invoice.id)} title="Annuler le paiement" aria-label="Annuler le paiement" className="text-orange-500 hover:text-orange-700">
-                      <CheckCircle className="size-3.5" />
+                    <Button variant="ghost" size="icon-xs" onClick={() => onMarkUnpaid(invoice.id)} title="Annuler paiement" aria-label="Annuler paiement" className="text-orange-500">
+                      <CheckCircle className="size-3" />
                     </Button>
                   )}
                   <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus-visible:bg-red-50 dark:focus-visible:bg-red-900/20"
+                    variant="ghost" size="icon-xs"
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     onClick={() => setDeleteTarget(invoice)}
                     title="Supprimer"
                     aria-label="Supprimer la facture"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-3" />
                   </Button>
                 </div>
               </div>
@@ -263,7 +259,7 @@ export function InvoiceGallery({
         </div>
       )}
 
-      {/* Modale de confirmation de suppression */}
+      {/* Modale suppression */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <DialogContent>
           <DialogHeader>
