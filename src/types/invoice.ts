@@ -128,6 +128,10 @@ export interface AISettings {
 
 export interface ParsedInvoiceData {
   clientName: string
+  clientAddress?: string
+  clientPostalCode?: string
+  clientCity?: string
+  contactName?: string
   purchaseOrder?: string
   notes?: string
   items: {

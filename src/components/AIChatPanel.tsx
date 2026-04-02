@@ -19,7 +19,13 @@ interface AIChatPanelProps {
 
 function formatAppliedData(data: ParsedInvoiceData): string {
   const lines: string[] = []
-  if (data.clientName) lines.push(`Client : ${data.clientName}`)
+  if (data.clientName) {
+    let clientLine = `Client : ${data.clientName}`
+    if (data.clientAddress) clientLine += `\n${data.clientAddress}`
+    if (data.clientPostalCode || data.clientCity) clientLine += `\n${[data.clientPostalCode, data.clientCity].filter(Boolean).join(' ')}`
+    if (data.contactName) clientLine += `\nContact : ${data.contactName}`
+    lines.push(clientLine)
+  }
   if (data.purchaseOrder) lines.push(`Bon de commande : ${data.purchaseOrder}`)
   if (data.items?.length) {
     data.items.forEach(item => {

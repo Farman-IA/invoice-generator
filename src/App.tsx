@@ -197,13 +197,13 @@ function App() {
             codeService: match.codeService,
           })
         } else {
-          // Reset complet : vider les anciens champs
+          // Reset complet + remplir avec les infos de l'IA
           inv.updateClient({
             companyName: data.clientName,
-            contactName: '',
-            address: '',
-            postalCode: '',
-            city: '',
+            contactName: data.contactName ?? '',
+            address: data.clientAddress ?? '',
+            postalCode: data.clientPostalCode ?? '',
+            city: data.clientCity ?? '',
             siren: '',
             tvaNumber: '',
             codeService: '',

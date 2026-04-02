@@ -10,6 +10,10 @@ const INVOICE_SCHEMA = {
   properties: {
     message: { type: Type.STRING, description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
     clientName: { type: Type.STRING, description: 'Nom du client ou de l\'entreprise' },
+    clientAddress: { type: Type.STRING, description: 'Adresse du client (rue)' },
+    clientPostalCode: { type: Type.STRING, description: 'Code postal du client' },
+    clientCity: { type: Type.STRING, description: 'Ville du client' },
+    contactName: { type: Type.STRING, description: 'Nom du contact chez le client' },
     purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande' },
     notes: { type: Type.STRING, description: 'Notes ou commentaires' },
     items: {
@@ -38,7 +42,7 @@ Tu dois quand même les mettre TELS QUELS dans unitPrice. La conversion TTC→HT
   return `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
 ## Quand le texte contient des données de facture :
-Extrait : clientName, purchaseOrder (si mentionné), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
+Extrait : clientName, clientAddress (si mentionnée), clientPostalCode (si mentionné), clientCity (si mentionnée), contactName (si mentionné), purchaseOrder (si mentionné), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
 Mets message à "" (vide).
 
 ${priceInstruction}
@@ -101,6 +105,10 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
 
   return {
     clientName: String(raw.clientName ?? ''),
+    clientAddress: raw.clientAddress ? String(raw.clientAddress) : undefined,
+    clientPostalCode: raw.clientPostalCode ? String(raw.clientPostalCode) : undefined,
+    clientCity: raw.clientCity ? String(raw.clientCity) : undefined,
+    contactName: raw.contactName ? String(raw.contactName) : undefined,
     purchaseOrder: raw.purchaseOrder ? String(raw.purchaseOrder) : undefined,
     notes: raw.notes ? String(raw.notes) : undefined,
     items,
