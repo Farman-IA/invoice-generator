@@ -90,7 +90,8 @@ function sanitizeVatRate(rate: number): VatRate {
 }
 
 function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
-  return Math.round((priceTtc / (1 + vatRate / 100)) * 100) / 100
+  // Pas d'arrondi — garder la precision pour que qty × prix HT × (1+TVA) = TTC exact
+  return priceTtc / (1 + vatRate / 100)
 }
 
 function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {
