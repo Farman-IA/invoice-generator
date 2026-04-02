@@ -90,7 +90,7 @@ export function LineItemsTable({
                 </td>
                 <td className="py-2.5 px-2 text-right">
                   <InlineEdit
-                    value={String(Math.round(item.unitPrice * 1000) / 1000)}
+                    value={String(Math.round(item.unitPrice * 100) / 100)}
                     onChange={(v) => onUpdate(item.id, { unitPrice: Math.max(0, Number(v) || 0) })}
                     as="number"
                     className="text-right w-full"
