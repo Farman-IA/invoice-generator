@@ -72,7 +72,12 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     addMessage('user', text)
     setInput('')
 
-    const result = await parse(text)
+    // Construire l'historique pour Gemini (sans les erreurs)
+    const history = messages
+      .filter(m => m.role !== 'error')
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
+    const result = await parse(text, history)
 
     if (result.data) {
       addMessage('assistant', formatAppliedData(result.data))
