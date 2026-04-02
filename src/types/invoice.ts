@@ -117,3 +117,20 @@ export interface ArticleTemplate {
   unitPrice: number
   vatRate: VatRate
 }
+
+export interface AISettings {
+  apiKey: string
+  model: 'gemini-2.5-flash' | 'gemini-2.5-pro'
+}
+
+export interface ParsedInvoiceData {
+  clientName: string
+  purchaseOrder?: string
+  notes?: string
+  items: {
+    description: string
+    quantity: number
+    unitPrice: number
+    vatRate: VatRate
+  }[]
+}

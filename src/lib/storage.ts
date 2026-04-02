@@ -1,4 +1,4 @@
-import type { SavedInvoice, SavedQuote, IssuerProfile, ClientRecord, ArticleTemplate } from '@/types/invoice'
+import type { SavedInvoice, SavedQuote, IssuerProfile, ClientRecord, ArticleTemplate, AISettings } from '@/types/invoice'
 
 const KEYS = {
   INVOICES: 'invoices',
@@ -9,6 +9,7 @@ const KEYS = {
   QUOTES: 'quotes',
   QUOTE_COUNTER: 'quote-counter',
   THEME: 'theme',
+  AI_SETTINGS: 'ai-settings',
 } as const
 
 async function get<T>(key: string, fallback: T): Promise<T> {
@@ -66,4 +67,8 @@ export const storage = {
   // Thème
   getTheme: () => get<'light' | 'dark'>(KEYS.THEME, 'light'),
   saveTheme: (theme: 'light' | 'dark') => set(KEYS.THEME, theme),
+
+  // Réglages IA
+  getAISettings: () => get<AISettings | null>(KEYS.AI_SETTINGS, null),
+  saveAISettings: (settings: AISettings) => set(KEYS.AI_SETTINGS, settings),
 }

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import type { IssuerProfile } from '@/types/invoice'
 import { storage } from '@/lib/storage'
+import { AISettingsSection } from '@/components/AISettingsSection'
 
 interface ProfileModalProps {
   open: boolean
@@ -89,6 +90,8 @@ export function ProfileModal({ open, onOpenChange, issuer, onUpdateIssuer }: Pro
               </div>
             </div>
           ))}
+
+          <AISettingsSection />
         </div>
 
         <DialogFooter>

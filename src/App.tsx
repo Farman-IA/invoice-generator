@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { LayoutDashboard, Plus, FileText, FilePen, Save, Download, Sun, Moon, Settings, User, Users, Bookmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -19,13 +19,15 @@ import { QuoteGallery } from '@/components/QuoteGallery'
 import { ProfileModal } from '@/components/ProfileModal'
 import { ClientsManager } from '@/components/ClientsManager'
 import { TemplatesManager } from '@/components/TemplatesManager'
+import { AIChatPanel } from '@/components/AIChatPanel'
+import { AIChatBubble } from '@/components/AIChatBubble'
 import { useInvoice } from '@/hooks/useInvoice'
 import { useQuotes } from '@/hooks/useQuotes'
 import { useClients } from '@/hooks/useClients'
 import { useArticleTemplates } from '@/hooks/useArticleTemplates'
 import { useTheme } from '@/hooks/useTheme'
 import { generatePDF } from '@/lib/pdf'
-import type { ClientInfo, LineItem, ArticleTemplate, VatRate, AppView } from '@/types/invoice'
+import type { ClientInfo, LineItem, ArticleTemplate, VatRate, AppView, ParsedInvoiceData } from '@/types/invoice'
 
 function App() {
   // Factures
@@ -49,6 +51,7 @@ function App() {
   const [showClients, setShowClients] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showAIChat, setShowAIChat] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -175,6 +178,47 @@ function App() {
     if (view === 'QUOTE_EDIT') qt.addLineItem(data)
     else inv.addLineItem(data)
   }
+
+  const handleApplyAIData = useCallback((data: ParsedInvoiceData) => {
+    // S'assurer d'être en mode édition facture
+    if (view !== 'EDIT') {
+      inv.newInvoice()
+      setGlobalView('EDIT')
+    }
+
+    // Remplir le client
+    if (data.clientName) {
+      const matches = findByName(data.clientName)
+      if (matches.length > 0) {
+        const { id: _, ...clientInfo } = matches[0]
+        inv.updateClient(clientInfo)
+      } else {
+        inv.updateClient({ companyName: data.clientName })
+      }
+    }
+
+    // Ajouter les lignes
+    if (data.items?.length) {
+      data.items.forEach(item => {
+        inv.addLineItem({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          vatRate: item.vatRate as VatRate,
+        })
+      })
+    }
+
+    // Métadonnées
+    if (data.purchaseOrder || data.notes) {
+      inv.updateInvoice({
+        ...(data.purchaseOrder && { purchaseOrder: data.purchaseOrder }),
+        ...(data.notes && { notes: data.notes }),
+      })
+    }
+
+    toast.success('Facture mise à jour par l\'IA')
+  }, [view, inv, findByName])
 
   if (inv.isLoading) {
     return (
@@ -366,25 +410,33 @@ function App() {
       )}
 
       {view === 'EDIT' && (
-        <div className="py-8 px-4">
-          <InvoiceDocument
-            ref={docRef}
-            mode="invoice"
-            issuer={inv.state.issuer}
-            client={inv.state.client}
-            invoice={inv.state.invoice}
-            onUpdateIssuer={inv.isFinalized ? () => {} : inv.updateIssuer}
-            onUpdateClient={inv.isFinalized ? () => {} : inv.updateClient}
-            onUpdateInvoice={inv.isFinalized ? () => {} : inv.updateInvoice}
-            onAddLine={inv.isFinalized ? () => {} : inv.addLineItem}
-            onRemoveLine={inv.isFinalized ? () => {} : inv.removeLineItem}
-            onUpdateLine={inv.isFinalized ? () => {} : inv.updateLineItem}
-            findClientByName={inv.isFinalized ? undefined : findByName}
-            onSelectClient={inv.isFinalized ? undefined : handleSelectClient}
-            templates={inv.isFinalized ? undefined : templates}
-            onSaveAsTemplate={inv.isFinalized ? undefined : handleSaveAsTemplate}
-            onInsertTemplate={inv.isFinalized ? undefined : handleInsertTemplate}
-          />
+        <div className="flex">
+          {/* Chat IA — desktop sidebar */}
+          <div className="hidden lg:block w-80 xl:w-96 flex-shrink-0 sticky top-[53px] h-[calc(100vh-53px)]">
+            <AIChatPanel open={true} onClose={() => {}} onApplyData={handleApplyAIData} />
+          </div>
+
+          {/* Facture */}
+          <div className="flex-1 py-8 px-4">
+            <InvoiceDocument
+              ref={docRef}
+              mode="invoice"
+              issuer={inv.state.issuer}
+              client={inv.state.client}
+              invoice={inv.state.invoice}
+              onUpdateIssuer={inv.isFinalized ? () => {} : inv.updateIssuer}
+              onUpdateClient={inv.isFinalized ? () => {} : inv.updateClient}
+              onUpdateInvoice={inv.isFinalized ? () => {} : inv.updateInvoice}
+              onAddLine={inv.isFinalized ? () => {} : inv.addLineItem}
+              onRemoveLine={inv.isFinalized ? () => {} : inv.removeLineItem}
+              onUpdateLine={inv.isFinalized ? () => {} : inv.updateLineItem}
+              findClientByName={inv.isFinalized ? undefined : findByName}
+              onSelectClient={inv.isFinalized ? undefined : handleSelectClient}
+              templates={inv.isFinalized ? undefined : templates}
+              onSaveAsTemplate={inv.isFinalized ? undefined : handleSaveAsTemplate}
+              onInsertTemplate={inv.isFinalized ? undefined : handleInsertTemplate}
+            />
+          </div>
         </div>
       )}
 
@@ -432,6 +484,21 @@ function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Chat IA — mobile drawer */}
+      {view === 'EDIT' && (
+        <>
+          <AIChatBubble onClick={() => setShowAIChat(true)} isOpen={showAIChat} />
+          {showAIChat && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div className="absolute inset-0 bg-black/40" onClick={() => setShowAIChat(false)} />
+              <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] animate-in slide-in-from-left duration-200">
+                <AIChatPanel open={true} onClose={() => setShowAIChat(false)} onApplyData={handleApplyAIData} />
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       <Toaster position="bottom-right" duration={3000} />
     </div>
