@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Edit, Copy, Trash2, Download, FileText, ArrowRight, Search, X, Send, Check, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,21 +38,23 @@ export function QuoteGallery({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'tous' | QuoteStatus>('tous')
 
-  let filtered = quotes
-  if (search) {
-    const q = search.toLowerCase()
-    filtered = filtered.filter(qt =>
-      qt.quote.number.toLowerCase().includes(q) ||
-      qt.client.companyName.toLowerCase().includes(q)
-    )
-  }
-  if (statusFilter !== 'tous') {
-    filtered = filtered.filter(qt => qt.status === statusFilter)
-  }
+  const sorted = useMemo(() => {
+    let filtered = quotes
+    if (search) {
+      const q = search.toLowerCase()
+      filtered = filtered.filter(qt =>
+        qt.quote.number.toLowerCase().includes(q) ||
+        qt.client.companyName.toLowerCase().includes(q)
+      )
+    }
+    if (statusFilter !== 'tous') {
+      filtered = filtered.filter(qt => qt.status === statusFilter)
+    }
 
-  const sorted = [...filtered].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  )
+    return [...filtered].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    )
+  }, [quotes, search, statusFilter])
 
   return (
     <>
@@ -60,13 +62,16 @@ export function QuoteGallery({
       <div className="mb-6 space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+            <label htmlFor="quote-search" className="sr-only">Rechercher les devis</label>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400 pointer-events-none" />
             <input
+              id="quote-search"
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Rechercher un devis..."
               className="w-full pl-10 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+              aria-label="Rechercher les devis"
             />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -125,31 +130,31 @@ export function QuoteGallery({
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-1 pt-1 border-t border-gray-100 dark:border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-1 pt-1 border-t border-gray-100 dark:border-gray-800 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                   {isBrouillon && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onEdit(quote.id)} title="Éditer">
+                    <Button variant="ghost" size="icon-sm" onClick={() => onEdit(quote.id)} title="Éditer" aria-label="Éditer le devis">
                       <Edit className="size-3.5" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon-sm" onClick={() => onDuplicate(quote.id)} title="Dupliquer">
+                  <Button variant="ghost" size="icon-sm" onClick={() => onDuplicate(quote.id)} title="Dupliquer" aria-label="Dupliquer le devis">
                     <Copy className="size-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon-sm" onClick={() => onDownload(quote.id)} title="Télécharger PDF">
+                  <Button variant="ghost" size="icon-sm" onClick={() => onDownload(quote.id)} title="Télécharger PDF" aria-label="Télécharger PDF">
                     <Download className="size-3.5" />
                   </Button>
 
                   {/* Changement de statut */}
                   {isBrouillon && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'envoyé')} title="Marquer envoyé" className="text-blue-500">
+                    <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'envoyé')} title="Marquer envoyé" aria-label="Marquer envoyé" className="text-blue-500">
                       <Send className="size-3.5" />
                     </Button>
                   )}
                   {quote.status === 'envoyé' && (
                     <>
-                      <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'accepté')} title="Accepté" className="text-emerald-500">
+                      <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'accepté')} title="Accepté" aria-label="Marquer accepté" className="text-emerald-500">
                         <Check className="size-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'refusé')} title="Refusé" className="text-red-500">
+                      <Button variant="ghost" size="icon-sm" onClick={() => onUpdateStatus(quote.id, 'refusé')} title="Refusé" aria-label="Marquer refusé" className="text-red-500">
                         <XCircle className="size-3.5" />
                       </Button>
                     </>
@@ -157,16 +162,17 @@ export function QuoteGallery({
 
                   {/* Convertir en facture */}
                   {isAccepted && !quote.linkedInvoiceId && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => onConvertToInvoice(quote.id)} title="Convertir en facture" className="text-emerald-600">
+                    <Button variant="ghost" size="icon-sm" onClick={() => onConvertToInvoice(quote.id)} title="Convertir en facture" aria-label="Convertir en facture" className="text-emerald-600">
                       <ArrowRight className="size-3.5" />
                     </Button>
                   )}
 
                   <Button
                     variant="ghost" size="icon-sm"
-                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus-visible:bg-red-50 dark:focus-visible:bg-red-900/20"
                     onClick={() => setDeleteTarget(quote)}
                     title="Supprimer"
+                    aria-label="Supprimer le devis"
                   >
                     <Trash2 className="size-3.5" />
                   </Button>

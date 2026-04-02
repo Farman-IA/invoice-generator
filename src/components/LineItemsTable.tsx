@@ -83,7 +83,7 @@ export function LineItemsTable({
                 <td className="py-2.5 px-2 text-center">
                   <InlineEdit
                     value={String(item.quantity)}
-                    onChange={(v) => onUpdate(item.id, { quantity: Math.max(0, Number(v) || 0) })}
+                    onChange={(v) => onUpdate(item.id, { quantity: Math.max(1, Number(v) || 1) })}
                     as="number"
                     className="text-center w-full"
                   />

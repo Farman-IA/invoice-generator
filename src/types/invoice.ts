@@ -26,7 +26,6 @@ export interface IssuerProfile {
   bankName: string
   iban: string
   bic: string
-  logo: string
 }
 
 export interface ClientInfo {

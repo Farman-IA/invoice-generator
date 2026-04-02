@@ -166,12 +166,14 @@ function patchElementColors(
 export async function generatePDF(
   element: HTMLElement,
   invoiceNumber: string,
-  clientName: string
+  clientName: string,
+  type: 'invoice' | 'quote' = 'invoice'
 ): Promise<void> {
   const date = new Date().toISOString().split('T')[0]
   const cleanClient = sanitizeFilename(clientName) || 'Client'
-  const cleanNumber = sanitizeFilename(invoiceNumber) || 'Facture'
-  const filename = `Facture_${cleanNumber}_${cleanClient}_${date}.pdf`
+  const cleanNumber = sanitizeFilename(invoiceNumber) || (type === 'invoice' ? 'Facture' : 'Devis')
+  const prefix = type === 'invoice' ? 'Facture' : 'Devis'
+  const filename = `${prefix}_${cleanNumber}_${cleanClient}_${date}.pdf`
 
   // Préparer l'élément : cacher les boutons/chevrons
   element.classList.add('pdf-capture')
@@ -212,21 +214,61 @@ export async function generatePDF(
 
     const pageWidth = 210
     const pageHeight = 297
+    const margin = 10
 
     const imgWidthPx = canvas.width / 2
     const imgHeightPx = canvas.height / 2
 
-    // Scale-to-fit : si le contenu depasse 1 page A4,
-    // reduire proportionnellement pour tout faire tenir
-    const scaleX = pageWidth / imgWidthPx
-    const scaleY = pageHeight / imgHeightPx
-    const fitScale = Math.min(scaleX, scaleY)
+    // Vérifier si le contenu rentre sur 1 page
+    const maxWidthMm = pageWidth - 2 * margin
+    const maxHeightMm = pageHeight - 2 * margin
+    const scale = Math.min(maxWidthMm / imgWidthPx, maxHeightMm / imgHeightPx)
 
-    const finalWidth = imgWidthPx * fitScale
-    const finalHeight = imgHeightPx * fitScale
+    if (scale >= 1) {
+      // Tout rentre sur 1 page, pas de scaling
+      const finalWidth = imgWidthPx
+      const finalHeight = imgHeightPx
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      pdf.addImage(imgData, 'JPEG', margin, margin, finalWidth, finalHeight)
+    } else {
+      // Contenu multi-pages : découper l'image en bandes
+      const pxPerPage = (pageHeight - 2 * margin) / scale // pixels par page
+      const numPages = Math.ceil(imgHeightPx / pxPerPage)
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.98)
-    pdf.addImage(imgData, 'JPEG', 0, 0, finalWidth, finalHeight)
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      const tempImg = new Image()
+      tempImg.src = imgData
+
+      for (let page = 0; page < numPages; page++) {
+        if (page > 0) {
+          pdf.addPage()
+        }
+
+        const srcY = page * pxPerPage
+        const srcHeight = Math.min(pxPerPage, imgHeightPx - srcY)
+
+        // Créer un canvas temporaire pour la bande
+        const bandCanvas = document.createElement('canvas')
+        bandCanvas.width = canvas.width
+        bandCanvas.height = srcHeight * 2
+        const ctx = bandCanvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(
+            canvas,
+            0, srcY * 2,
+            canvas.width, srcHeight * 2,
+            0, 0,
+            canvas.width, srcHeight * 2
+          )
+        }
+
+        const bandData = bandCanvas.toDataURL('image/jpeg', 0.98)
+        const finalWidth = imgWidthPx * scale
+        const finalHeight = srcHeight * scale
+
+        pdf.addImage(bandData, 'JPEG', margin, margin, finalWidth, finalHeight)
+      }
+    }
 
     pdf.save(filename)
   } finally {

@@ -10,6 +10,7 @@ import type {
   AppView,
 } from '@/types/invoice'
 import { storage } from '@/lib/storage'
+import { calculateTotals } from '@/lib/calculations'
 import {
   getDefaultIssuer,
   getDefaultClient,
@@ -125,6 +126,35 @@ export function useInvoice() {
     }
   }, [state.issuer, isLoading])
 
+  // Sauvegarder le profil émetteur avant de fermer l'onglet
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (issuerSaveTimeout.current) {
+        clearTimeout(issuerSaveTimeout.current)
+        storage.saveIssuerProfile(stateRef.current.issuer)
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // Synchroniser le profil émetteur avec storage quand il change ailleurs
+  useEffect(() => {
+    const interval = setInterval(() => {
+      storage.getIssuerProfile().then(issuer => {
+        if (issuer) {
+          setState(prev => {
+            if (JSON.stringify(prev.issuer) !== JSON.stringify(issuer)) {
+              return { ...prev, issuer }
+            }
+            return prev
+          })
+        }
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const updateIssuer = useCallback((partial: Partial<IssuerProfile>) => {
     setState(prev => ({ ...prev, issuer: { ...prev.issuer, ...partial } }))
   }, [])
@@ -231,6 +261,26 @@ export function useInvoice() {
 
   // Finaliser la facture : statut → finalisée, sauvegarder
   const finalizeInvoice = useCallback(async (): Promise<boolean> => {
+    // Valider les champs obligatoires
+    if (!stateRef.current.client.companyName?.trim()) {
+      toast.error('Veuillez renseigner le client')
+      return false
+    }
+
+    const items = stateRef.current.invoice.items.filter(
+      item => item.description?.trim() && item.unitPrice > 0 && item.quantity > 0
+    )
+    if (items.length === 0) {
+      toast.error('Ajoutez au moins une ligne avec description, prix et quantité > 0')
+      return false
+    }
+
+    const totals = calculateTotals(items)
+    if (totals.totalTTC <= 0) {
+      toast.error('Le montant total doit être > 0 €')
+      return false
+    }
+
     await upsertAndPersist('finalisée')
     setIsFinalized(true)
     toast.success('Facture finalisée')
@@ -299,9 +349,15 @@ export function useInvoice() {
     setIsFinalized(false)
     setView('EDIT')
 
-    await storage.saveInvoices(updated)
-    await storage.saveCounter(newCounter)
-    toast.success('Facture dupliquée')
+    const [saveOk, counterOk] = await Promise.all([
+      storage.saveInvoices(updated),
+      storage.saveCounter(newCounter),
+    ])
+    if (!saveOk || !counterOk) {
+      toast.error('Erreur de sauvegarde')
+    } else {
+      toast.success('Facture dupliquée')
+    }
   }, [])
 
   // Supprimer une facture
@@ -310,7 +366,11 @@ export function useInvoice() {
     setSavedInvoices(updated)
     savedInvoicesRef.current = updated
 
-    await storage.saveInvoices(updated)
+    const ok = await storage.saveInvoices(updated)
+    if (!ok) {
+      toast.error('Erreur de sauvegarde')
+      return
+    }
 
     if (id === currentInvoiceIdRef.current) {
       setCurrentInvoiceId(null)
@@ -328,8 +388,12 @@ export function useInvoice() {
     )
     setSavedInvoices(updated)
     savedInvoicesRef.current = updated
-    await storage.saveInvoices(updated)
-    toast.success('Facture marquée comme payée')
+    const ok = await storage.saveInvoices(updated)
+    if (!ok) {
+      toast.error('Erreur de sauvegarde')
+    } else {
+      toast.success('Facture marquée comme payée')
+    }
   }, [])
 
   // Annuler le paiement (remettre en attente)
@@ -361,8 +425,12 @@ export function useInvoice() {
     setIsFinalized(false)
     setView('EDIT')
 
-    await storage.saveCounter(newCounter)
-    toast.success('Nouvelle facture créée')
+    const ok = await storage.saveCounter(newCounter)
+    if (!ok) {
+      toast.error('Erreur de sauvegarde du compteur')
+    } else {
+      toast.success('Nouvelle facture créée')
+    }
   }, [])
 
   return {

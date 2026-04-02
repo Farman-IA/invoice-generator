@@ -4,6 +4,7 @@ const KEYS = {
   INVOICES: 'invoices',
   INVOICE_COUNTER: 'invoice-counter',
   ISSUER_PROFILE: 'issuer-profile',
+  ISSUER_LOGO: 'issuer-logo',
   CLIENTS: 'clients',
   ARTICLE_TEMPLATES: 'articleTemplates',
   QUOTES: 'quotes',
@@ -71,4 +72,8 @@ export const storage = {
   // Réglages IA
   getAISettings: () => get<AISettings | null>(KEYS.AI_SETTINGS, null),
   saveAISettings: (settings: AISettings) => set(KEYS.AI_SETTINGS, settings),
+
+  // Logo (séparé pour ne pas surcharger localStorage dans chaque facture)
+  getLogo: () => get<string>(KEYS.ISSUER_LOGO, ''),
+  saveLogo: (logo: string) => set(KEYS.ISSUER_LOGO, logo),
 }

@@ -106,9 +106,18 @@ export function InlineEdit({
   return (
     <span
       onClick={() => setIsEditing(true)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          setIsEditing(true)
+        }
+      }}
+      tabIndex={0}
+      role="textbox"
+      aria-label={placeholder || 'Champ éditable'}
+      aria-readonly="false"
       className={cn(
         baseClasses,
-        'cursor-text hover:bg-blue-50/60 block min-w-[2rem] px-0.5',
+        'cursor-text hover:bg-blue-50/60 block min-w-[2rem] px-0.5 focus:outline-none focus:bg-blue-50/40 focus:ring-1 focus:ring-blue-200 dark:focus:bg-blue-900/20 dark:focus:ring-blue-800',
         !displayValue && 'text-gray-400 italic',
       )}
     >

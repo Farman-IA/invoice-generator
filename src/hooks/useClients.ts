@@ -24,14 +24,16 @@ export function useClients() {
     const updated = clientsRef.current.map(c => c.id === id ? { ...c, ...partial } : c)
     setClients(updated)
     clientsRef.current = updated
-    await storage.saveClients(updated)
+    const ok = await storage.saveClients(updated)
+    if (!ok) console.error('Erreur de sauvegarde client')
   }, [])
 
   const deleteClient = useCallback(async (id: string) => {
     const updated = clientsRef.current.filter(c => c.id !== id)
     setClients(updated)
     clientsRef.current = updated
-    await storage.saveClients(updated)
+    const ok = await storage.saveClients(updated)
+    if (!ok) console.error('Erreur de suppression client')
   }, [])
 
   const findByName = useCallback((query: string): ClientRecord[] => {

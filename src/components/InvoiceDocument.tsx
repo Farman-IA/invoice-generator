@@ -13,6 +13,8 @@ import { VALIDITY_OPTIONS } from '@/lib/constants'
 interface BaseDocumentProps {
   issuer: IssuerProfile
   client: ClientInfo
+  logo?: string
+  onUpdateLogo?: (logo: string) => void
   onUpdateIssuer: (partial: Partial<IssuerProfile>) => void
   onUpdateClient: (partial: Partial<ClientInfo>) => void
   onAddLine: () => void
@@ -74,6 +76,8 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
       issuer,
       client,
       invoice,
+      logo = '',
+      onUpdateLogo,
       onUpdateIssuer,
       onUpdateClient,
       onUpdateInvoice,
@@ -111,7 +115,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
 
       const reader = new FileReader()
       reader.onload = (ev) => {
-        onUpdateIssuer({ logo: ev.target?.result as string })
+        onUpdateLogo?.(ev.target?.result as string)
       }
       reader.readAsDataURL(file)
     }
@@ -129,13 +133,13 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               onClick={() => logoInputRef.current?.click()}
               className={cn(
                 "w-36 h-20 mb-3 rounded-lg flex items-center justify-center cursor-pointer transition-colors overflow-hidden",
-                issuer.logo
+                logo
                   ? "border-0 hover:opacity-80"
                   : "border-2 border-dashed border-gray-200 hover:border-gray-400 hover:bg-gray-50"
               )}
             >
-              {issuer.logo ? (
-                <img src={issuer.logo} alt="Logo" className="max-w-full max-h-full object-contain" />
+              {logo ? (
+                <img src={logo} alt="Logo" className="max-w-full max-h-full object-contain" />
               ) : (
                 <div className="text-gray-400 flex flex-col items-center gap-1">
                   <ImagePlus className="size-5" />

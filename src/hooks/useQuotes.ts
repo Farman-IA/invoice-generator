@@ -64,6 +64,23 @@ export function useQuotes() {
     load()
   }, [])
 
+  // Synchroniser le profil émetteur avec storage quand il change ailleurs
+  useEffect(() => {
+    const interval = setInterval(() => {
+      storage.getIssuerProfile().then(issuer => {
+        if (issuer) {
+          setState(prev => {
+            if (JSON.stringify(prev.issuer) !== JSON.stringify(issuer)) {
+              return { ...prev, issuer }
+            }
+            return prev
+          })
+        }
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const updateIssuer = useCallback((partial: Partial<IssuerProfile>) => {
     setState(prev => ({ ...prev, issuer: { ...prev.issuer, ...partial } }))
   }, [])
@@ -172,7 +189,7 @@ export function useQuotes() {
     )
     setSavedQuotes(updated)
     savedQuotesRef.current = updated
-    await storage.saveQuotes(updated)
+    const ok = await storage.saveQuotes(updated)
 
     // Mettre à jour le lock si c'est le devis courant
     if (id === currentQuoteIdRef.current) {
@@ -185,7 +202,11 @@ export function useQuotes() {
       accepté: 'Devis accepté',
       refusé: 'Devis refusé',
     }
-    toast.success(labels[status])
+    if (!ok) {
+      toast.error('Erreur de sauvegarde')
+    } else {
+      toast.success(labels[status])
+    }
   }, [])
 
   // Dupliquer un devis
@@ -196,6 +217,10 @@ export function useQuotes() {
     const now = new Date().toISOString()
     const newCounter = stateRef.current.counter + 1
 
+    const newIssueDate = new Date().toISOString().split('T')[0]
+    const newValidUntil = new Date()
+    newValidUntil.setDate(newValidUntil.getDate() + 30)
+
     const duplicated: SavedQuote = {
       id: crypto.randomUUID(),
       issuer: { ...original.issuer },
@@ -203,7 +228,9 @@ export function useQuotes() {
       quote: {
         ...original.quote,
         number: generateQuoteNumber(newCounter),
-        issueDate: new Date().toISOString().split('T')[0],
+        issueDate: newIssueDate,
+        validityDays: 30,
+        validUntil: newValidUntil.toISOString().split('T')[0],
         items: original.quote.items.map(item => ({ ...item, id: crypto.randomUUID() })),
       },
       status: 'brouillon',
@@ -225,9 +252,15 @@ export function useQuotes() {
     currentQuoteIdRef.current = duplicated.id
     setIsLocked(false)
 
-    await storage.saveQuotes(updated)
-    await storage.saveQuoteCounter(newCounter)
-    toast.success('Devis dupliqué')
+    const [savOk, counterOk] = await Promise.all([
+      storage.saveQuotes(updated),
+      storage.saveQuoteCounter(newCounter),
+    ])
+    if (!savOk || !counterOk) {
+      toast.error('Erreur de sauvegarde')
+    } else {
+      toast.success('Devis dupliqué')
+    }
   }, [])
 
   // Supprimer un devis
@@ -235,7 +268,11 @@ export function useQuotes() {
     const updated = savedQuotesRef.current.filter(q => q.id !== id)
     setSavedQuotes(updated)
     savedQuotesRef.current = updated
-    await storage.saveQuotes(updated)
+    const ok = await storage.saveQuotes(updated)
+    if (!ok) {
+      toast.error('Erreur de sauvegarde')
+      return
+    }
 
     if (id === currentQuoteIdRef.current) {
       setCurrentQuoteId(null)
@@ -269,7 +306,10 @@ export function useQuotes() {
     )
     setSavedQuotes(updated)
     savedQuotesRef.current = updated
-    await storage.saveQuotes(updated)
+    const ok = await storage.saveQuotes(updated)
+    if (!ok) {
+      console.error('Erreur de liaison devis → facture')
+    }
   }, [])
 
   return {

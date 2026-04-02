@@ -27,6 +27,7 @@ import { useClients } from '@/hooks/useClients'
 import { useArticleTemplates } from '@/hooks/useArticleTemplates'
 import { useTheme } from '@/hooks/useTheme'
 import { generatePDF } from '@/lib/pdf'
+import { storage } from '@/lib/storage'
 import type { ClientInfo, LineItem, ArticleTemplate, VatRate, AppView, ParsedInvoiceData } from '@/types/invoice'
 
 function App() {
@@ -38,11 +39,22 @@ function App() {
   const { clients, addClient, updateClient: updateClientRecord, deleteClient: deleteClientRecord, findByName, existsByName } = useClients()
   const { templates, addTemplate, updateTemplate, deleteTemplate } = useArticleTemplates()
   const { theme, toggleTheme } = useTheme()
+  const [logo, setLogo] = useState('')
 
   const docRef = useRef<HTMLDivElement>(null)
 
   // Vue globale (unifie factures et devis)
   const [view, setGlobalView] = useState<AppView>('DASHBOARD')
+
+  // Charger le logo au montage
+  useEffect(() => {
+    storage.getLogo().then(setLogo)
+  }, [])
+
+  const updateLogo = async (newLogo: string) => {
+    setLogo(newLogo)
+    await storage.saveLogo(newLogo)
+  }
 
 
 
@@ -66,7 +78,7 @@ function App() {
   // --- Handlers factures ---
   const handleDownloadPDF = async () => {
     if (!docRef.current) return
-    await generatePDF(docRef.current, inv.state.invoice.number, inv.state.client.companyName)
+    await generatePDF(docRef.current, inv.state.invoice.number, inv.state.client.companyName, 'invoice')
   }
 
   const handleFinalize = async () => {
@@ -75,7 +87,7 @@ function App() {
     const ok = await inv.finalizeInvoice()
     if (ok) {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => { if (docRef.current) generatePDF(docRef.current, num, client) })
+        requestAnimationFrame(() => { if (docRef.current) generatePDF(docRef.current, num, client, 'invoice') })
       })
     }
   }
@@ -89,7 +101,7 @@ function App() {
     setGlobalView('EDIT')
     requestAnimationFrame(() => {
       requestAnimationFrame(async () => {
-        if (docRef.current) { await generatePDF(docRef.current, num, client); setGlobalView('GALLERY') }
+        if (docRef.current) { await generatePDF(docRef.current, num, client, 'invoice'); setGlobalView('GALLERY') }
       })
     })
   }
@@ -126,27 +138,24 @@ function App() {
     setGlobalView('QUOTE_EDIT')
     requestAnimationFrame(() => {
       requestAnimationFrame(async () => {
-        if (docRef.current) { await generatePDF(docRef.current, num, client); setGlobalView('QUOTE_GALLERY') }
+        if (docRef.current) { await generatePDF(docRef.current, num, client, 'quote'); setGlobalView('QUOTE_GALLERY') }
       })
     })
   }
 
   const handleQuotePDF = async () => {
     if (!docRef.current) return
-    await generatePDF(docRef.current, qt.state.quote.number, qt.state.client.companyName)
+    await generatePDF(docRef.current, qt.state.quote.number, qt.state.client.companyName, 'quote')
     toast.success('PDF du devis téléchargé')
   }
 
   // Conversion devis → facture
-  const handleConvertToInvoice = async (quoteId: string) => {
+  const handleConvertToInvoice = (quoteId: string) => {
     const quote = qt.savedQuotes.find(q => q.id === quoteId)
     if (!quote) return
 
     // Pré-remplir une nouvelle facture avec les données du devis
-    inv.newInvoice()
-
-    // Attendre un tick pour que newInvoice ait mis à jour le state
-    requestAnimationFrame(() => {
+    inv.newInvoice().then(() => {
       inv.updateIssuer(quote.issuer)
       inv.updateClient(quote.client)
       inv.updateInvoice({
@@ -155,7 +164,7 @@ function App() {
         items: quote.quote.items.map(item => ({ ...item, id: crypto.randomUUID() })),
       })
 
-      // Lier le devis à la facture (le lien sera mis à jour après save)
+      // Lier le devis à la facture
       qt.linkToInvoice(quoteId, 'pending')
 
       setGlobalView('EDIT')
@@ -236,10 +245,9 @@ function App() {
 
     // Si pas en mode édition, créer une nouvelle facture et attendre le rendu
     if (view !== 'EDIT') {
-      inv.newInvoice()
-      setGlobalView('EDIT')
-      requestAnimationFrame(() => {
-        requestAnimationFrame(applyData)
+      inv.newInvoice().then(() => {
+        setGlobalView('EDIT')
+        setTimeout(applyData, 0)
       })
     } else {
       applyData()
@@ -270,7 +278,7 @@ function App() {
             </Button>
             <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 self-center" />
             <Button variant={view === 'EDIT' ? 'default' : 'ghost'} size="sm"
-              onClick={() => { inv.newInvoice(); setGlobalView('EDIT') }}>
+              onClick={async () => { await inv.newInvoice(); setGlobalView('EDIT') }}>
               <Plus className="size-4 mr-1" />
               Facture
             </Button>
@@ -286,7 +294,7 @@ function App() {
             </Button>
             <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 self-center" />
             <Button variant={view === 'QUOTE_EDIT' ? 'default' : 'ghost'} size="sm"
-              onClick={() => { qt.newQuote(); setGlobalView('QUOTE_EDIT') }}>
+              onClick={async () => { await qt.newQuote(); setGlobalView('QUOTE_EDIT') }}>
               <Plus className="size-4 mr-1" />
               Devis
             </Button>
@@ -450,6 +458,8 @@ function App() {
               issuer={inv.state.issuer}
               client={inv.state.client}
               invoice={inv.state.invoice}
+              logo={logo}
+              onUpdateLogo={inv.isFinalized ? () => {} : updateLogo}
               onUpdateIssuer={inv.isFinalized ? () => {} : inv.updateIssuer}
               onUpdateClient={inv.isFinalized ? () => {} : inv.updateClient}
               onUpdateInvoice={inv.isFinalized ? () => {} : inv.updateInvoice}
@@ -474,6 +484,8 @@ function App() {
             issuer={qt.state.issuer}
             client={qt.state.client}
             invoice={qt.state.quote}
+            logo={logo}
+            onUpdateLogo={qt.isLocked ? () => {} : updateLogo}
             onUpdateIssuer={qt.isLocked ? () => {} : qt.updateIssuer}
             onUpdateClient={qt.isLocked ? () => {} : qt.updateClient}
             onUpdateInvoice={qt.isLocked ? () => {} : qt.updateQuote}

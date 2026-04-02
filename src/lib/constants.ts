@@ -46,7 +46,6 @@ export function getDefaultIssuer(): IssuerProfile {
     bankName: 'Crédit Mutuel',
     iban: 'FR76 1027 8060 0100 0204 6830 174',
     bic: 'CMCIFR2A',
-    logo: '',
   }
 }
 
@@ -151,7 +150,7 @@ export const PLACEHOLDERS = {
     bankName: 'Nom de la banque',
     iban: 'FR76 XXXX XXXX XXXX XXXX XXXX XXX',
     bic: 'BIC / SWIFT',
-  },
+  } as const,
   client: {
     companyName: 'Nom de la société client',
     contactName: 'Nom du contact',
