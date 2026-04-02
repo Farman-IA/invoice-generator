@@ -180,53 +180,60 @@ function App() {
   }
 
   const handleApplyAIData = useCallback((data: ParsedInvoiceData) => {
-    // S'assurer d'être en mode édition facture
+    const applyData = () => {
+      // Remplir le client
+      if (data.clientName) {
+        const matches = findByName(data.clientName)
+        if (matches.length > 0) {
+          const match = matches[0]
+          inv.updateClient({
+            companyName: match.companyName,
+            contactName: match.contactName,
+            address: match.address,
+            postalCode: match.postalCode,
+            city: match.city,
+            siren: match.siren,
+            tvaNumber: match.tvaNumber,
+            codeService: match.codeService,
+          })
+        } else {
+          inv.updateClient({ companyName: data.clientName })
+        }
+      }
+
+      // Ajouter les lignes (vatRate déjà validé par useAIParser)
+      if (data.items?.length) {
+        data.items.forEach(item => {
+          inv.addLineItem({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            vatRate: item.vatRate,
+          })
+        })
+      }
+
+      // Métadonnées
+      if (data.purchaseOrder || data.notes) {
+        inv.updateInvoice({
+          ...(data.purchaseOrder && { purchaseOrder: data.purchaseOrder }),
+          ...(data.notes && { notes: data.notes }),
+        })
+      }
+
+      toast.success('Facture mise à jour par l\'IA')
+    }
+
+    // Si pas en mode édition, créer une nouvelle facture et attendre le rendu
     if (view !== 'EDIT') {
       inv.newInvoice()
       setGlobalView('EDIT')
-    }
-
-    // Remplir le client
-    if (data.clientName) {
-      const matches = findByName(data.clientName)
-      if (matches.length > 0) {
-        const match = matches[0]
-        inv.updateClient({
-          companyName: match.companyName,
-          contactName: match.contactName,
-          address: match.address,
-          postalCode: match.postalCode,
-          city: match.city,
-          siren: match.siren,
-          tvaNumber: match.tvaNumber,
-          codeService: match.codeService,
-        })
-      } else {
-        inv.updateClient({ companyName: data.clientName })
-      }
-    }
-
-    // Ajouter les lignes
-    if (data.items?.length) {
-      data.items.forEach(item => {
-        inv.addLineItem({
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          vatRate: item.vatRate as VatRate,
-        })
+      requestAnimationFrame(() => {
+        requestAnimationFrame(applyData)
       })
+    } else {
+      applyData()
     }
-
-    // Métadonnées
-    if (data.purchaseOrder || data.notes) {
-      inv.updateInvoice({
-        ...(data.purchaseOrder && { purchaseOrder: data.purchaseOrder }),
-        ...(data.notes && { notes: data.notes }),
-      })
-    }
-
-    toast.success('Facture mise à jour par l\'IA')
   }, [view, inv, findByName])
 
   if (inv.isLoading) {

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GoogleGenAI, Type } from '@google/genai'
 import { storage } from '@/lib/storage'
-import type { AISettings, ParsedInvoiceData } from '@/types/invoice'
+import type { AISettings, ParsedInvoiceData, VatRate } from '@/types/invoice'
+
+const VALID_VAT_RATES: VatRate[] = [5.5, 10, 20]
 
 const INVOICE_SCHEMA = {
   type: Type.OBJECT,
@@ -39,6 +41,51 @@ Règles TVA restauration France :
 Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 Les prix sont des nombres décimaux (30.00, pas "30 euros").`
 
+function sanitizeVatRate(rate: number): VatRate {
+  if (VALID_VAT_RATES.includes(rate as VatRate)) return rate as VatRate
+  return 20
+}
+
+function validateParsedData(raw: Record<string, unknown>): ParsedInvoiceData | null {
+  if (!raw.clientName && (!Array.isArray(raw.items) || raw.items.length === 0)) {
+    return null
+  }
+
+  const items = Array.isArray(raw.items)
+    ? raw.items
+        .filter((item: Record<string, unknown>) =>
+          item && typeof item.description === 'string' && item.description.trim() !== ''
+        )
+        .map((item: Record<string, unknown>) => ({
+          description: String(item.description),
+          quantity: Math.max(1, Number(item.quantity) || 1),
+          unitPrice: Math.max(0, Number(item.unitPrice) || 0),
+          vatRate: sanitizeVatRate(Number(item.vatRate)),
+        }))
+    : []
+
+  return {
+    clientName: String(raw.clientName ?? ''),
+    purchaseOrder: raw.purchaseOrder ? String(raw.purchaseOrder) : undefined,
+    notes: raw.notes ? String(raw.notes) : undefined,
+    items,
+  }
+}
+
+function formatError(err: unknown): string {
+  if (!(err instanceof Error)) return 'Erreur inattendue. Réessayez.'
+  const msg = err.message.toLowerCase()
+  if (msg.includes('api key') || msg.includes('401') || msg.includes('unauthorized'))
+    return 'Clé API invalide. Vérifiez-la dans Réglages → Mon profil.'
+  if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
+    return 'Trop de requêtes. Attendez quelques secondes.'
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed'))
+    return 'Erreur réseau. Vérifiez votre connexion internet.'
+  if (msg.includes('404') || msg.includes('model'))
+    return 'Modèle IA non disponible. Essayez un autre modèle dans les réglages.'
+  return 'Erreur lors de l\'analyse. Réessayez.'
+}
+
 export function useAIParser() {
   const [settings, setSettings] = useState<AISettings | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -54,8 +101,12 @@ export function useAIParser() {
   }, [])
 
   const parse = useCallback(async (text: string): Promise<ParsedInvoiceData | null> => {
-    if (!settings?.apiKey) {
-      setError('Clé API manquante. Configurez-la dans Réglages > Mon profil.')
+    // F4: toujours relire les settings depuis le storage pour éviter la désynchronisation
+    const currentSettings = await storage.getAISettings()
+    if (currentSettings) setSettings(currentSettings)
+
+    if (!currentSettings?.apiKey) {
+      setError('Clé API manquante. Configurez-la dans Réglages → Mon profil.')
       return null
     }
 
@@ -63,9 +114,9 @@ export function useAIParser() {
     setError(null)
 
     try {
-      const ai = new GoogleGenAI({ apiKey: settings.apiKey })
+      const ai = new GoogleGenAI({ apiKey: currentSettings.apiKey })
       const response = await ai.models.generateContent({
-        model: settings.model,
+        model: currentSettings.model,
         contents: `${SYSTEM_PROMPT}\n\nTexte :\n${text}`,
         config: {
           responseMimeType: 'application/json',
@@ -73,16 +124,22 @@ export function useAIParser() {
         },
       })
 
-      const parsed = JSON.parse(response.text ?? '{}') as ParsedInvoiceData
+      const raw = JSON.parse(response.text ?? '{}')
+      const parsed = validateParsedData(raw)
+
+      if (!parsed) {
+        setError('Aucune donnée exploitable trouvée. Reformulez votre description.')
+        return null
+      }
+
       return parsed
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue'
-      setError(message)
+      setError(formatError(err))
       return null
     } finally {
       setIsLoading(false)
     }
-  }, [settings])
+  }, [])
 
   return { settings, updateSettings, parse, isLoading, error }
 }

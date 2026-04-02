@@ -27,18 +27,19 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
     })
   }, [])
 
-  const handleApiKeyChange = (value: string) => {
-    setApiKey(value)
-    const newSettings: AISettings = { apiKey: value, model }
+  const saveSettings = (key: string, mod: AISettings['model']) => {
+    const newSettings: AISettings = { apiKey: key, model: mod }
     storage.saveAISettings(newSettings)
     onSettingsChange?.(newSettings)
   }
 
+  const handleApiKeyBlur = () => {
+    saveSettings(apiKey, model)
+  }
+
   const handleModelChange = (value: AISettings['model']) => {
     setModel(value)
-    const newSettings: AISettings = { apiKey, model: value }
-    storage.saveAISettings(newSettings)
-    onSettingsChange?.(newSettings)
+    saveSettings(apiKey, value)
   }
 
   return (
@@ -53,7 +54,8 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
             <input
               type={showKey ? 'text' : 'password'}
               value={apiKey}
-              onChange={e => handleApiKeyChange(e.target.value)}
+              onChange={e => setApiKey(e.target.value)}
+              onBlur={handleApiKeyBlur}
               placeholder="AIza..."
               className="w-full px-2 py-1.5 pr-9 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
             />
