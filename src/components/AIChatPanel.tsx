@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Mic, MicOff, X, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAIParser } from '@/hooks/useAIParser'
@@ -34,9 +34,14 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const { parse, isLoading, error, settings } = useAIParser()
-  const speech = useSpeechRecognition()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const handleTranscript = useCallback((text: string) => {
+    setInput(text)
+  }, [])
+
+  const speech = useSpeechRecognition({ onTranscript: handleTranscript })
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -47,12 +52,6 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [open])
-
-  useEffect(() => {
-    if (speech.transcript) {
-      setInput(speech.transcript)
-    }
-  }, [speech.transcript])
 
   const handleSubmit = async () => {
     const text = input.trim()

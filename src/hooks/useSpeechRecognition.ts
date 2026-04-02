@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 interface SpeechRecognitionResult {
   readonly isFinal: boolean
@@ -34,13 +34,20 @@ declare global {
   }
 }
 
-export function useSpeechRecognition() {
-  const [transcript, setTranscript] = useState('')
+interface UseSpeechRecognitionOptions {
+  onTranscript?: (text: string) => void
+}
+
+export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) {
   const [isListening, setIsListening] = useState(false)
   const [isSupported] = useState(() =>
     typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
   )
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const onTranscriptRef = useRef(options.onTranscript)
+  useEffect(() => {
+    onTranscriptRef.current = options.onTranscript
+  })
 
   const start = useCallback(() => {
     if (!isSupported) return
@@ -63,7 +70,7 @@ export function useSpeechRecognition() {
           interim += result[0].transcript
         }
       }
-      setTranscript(finalTranscript + interim)
+      onTranscriptRef.current?.(finalTranscript + interim)
     }
 
     recognition.onend = () => {
@@ -77,7 +84,6 @@ export function useSpeechRecognition() {
     recognitionRef.current = recognition
     recognition.start()
     setIsListening(true)
-    setTranscript('')
   }, [isSupported])
 
   const stop = useCallback(() => {
@@ -88,9 +94,5 @@ export function useSpeechRecognition() {
     setIsListening(false)
   }, [])
 
-  const reset = useCallback(() => {
-    setTranscript('')
-  }, [])
-
-  return { transcript, isListening, isSupported, start, stop, reset }
+  return { isListening, isSupported, start, stop }
 }

@@ -190,8 +190,17 @@ function App() {
     if (data.clientName) {
       const matches = findByName(data.clientName)
       if (matches.length > 0) {
-        const { id: _, ...clientInfo } = matches[0]
-        inv.updateClient(clientInfo)
+        const match = matches[0]
+        inv.updateClient({
+          companyName: match.companyName,
+          contactName: match.contactName,
+          address: match.address,
+          postalCode: match.postalCode,
+          city: match.city,
+          siren: match.siren,
+          tvaNumber: match.tvaNumber,
+          codeService: match.codeService,
+        })
       } else {
         inv.updateClient({ companyName: data.clientName })
       }
