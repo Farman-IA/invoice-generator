@@ -7,7 +7,7 @@ import type { ParsedInvoiceData } from '@/types/invoice'
 
 interface ChatMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'error'
   content: string
 }
 
@@ -33,7 +33,7 @@ function formatAppliedData(data: ParsedInvoiceData): string {
 export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const { parse, isLoading, error, settings } = useAIParser()
+  const { parse, isLoading, settings } = useAIParser()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -53,38 +53,28 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     }
   }, [open])
 
+  const addMessage = (role: ChatMessage['role'], content: string) => {
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role, content }])
+  }
+
   const handleSubmit = async () => {
     const text = input.trim()
     if (!text || isLoading) return
 
     if (speech.isListening) speech.stop()
 
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-    }
-    setMessages(prev => [...prev, userMsg])
+    addMessage('user', text)
     setInput('')
 
     const result = await parse(text)
 
     if (result.data) {
-      const summary = formatAppliedData(result.data)
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: summary,
-      }
-      setMessages(prev => [...prev, assistantMsg])
+      addMessage('assistant', formatAppliedData(result.data))
       onApplyData(result.data)
     } else if (result.message) {
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: result.message,
-      }
-      setMessages(prev => [...prev, assistantMsg])
+      addMessage('assistant', result.message)
+    } else if (result.error) {
+      addMessage('error', result.error)
     }
   }
 
@@ -121,49 +111,47 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${messages.length === 0 ? 'flex items-center justify-center' : ''}`}>
         {messages.length === 0 && (
-          <div className="text-center py-8">
+          <div className="text-center">
             <Sparkles className="size-8 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Décrivez votre facture en français
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Ex : « Facture pour l'Université de Lorraine, 3 repas complets à 30€ »
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 leading-relaxed">
+              Ex : « Facture pour l'Université de Lorraine,<br />3 repas complets à 30€ »
             </p>
           </div>
         )}
 
-        {messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-line ${
-              msg.role === 'user'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-            }`}>
-              {msg.content}
-            </div>
-          </div>
-        ))}
+        {messages.length > 0 && (
+          <>
+            {messages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-line ${
+                  msg.role === 'user'
+                    ? 'bg-blue-500 text-white'
+                    : msg.role === 'error'
+                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                }`}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
 
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2 text-sm text-gray-500 flex items-center gap-2">
-              <Loader2 className="size-3.5 animate-spin" />
-              Analyse en cours...
-            </div>
-          </div>
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2 text-sm text-gray-500 flex items-center gap-2">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Analyse en cours...
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </>
         )}
-
-        {error && (
-          <div className="flex justify-start">
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl px-3 py-2 text-sm">
-              {error}
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

@@ -443,7 +443,7 @@ function App() {
           </div>
 
           {/* Facture */}
-          <div className="flex-1 py-8 px-4">
+          <div className="flex-1 py-8 px-4 max-w-5xl mx-auto">
             <InvoiceDocument
               ref={docRef}
               mode="invoice"
@@ -517,8 +517,14 @@ function App() {
           <AIChatBubble onClick={() => setShowAIChat(true)} isOpen={showAIChat} />
           {showAIChat && (
             <div className="fixed inset-0 z-50 lg:hidden">
-              <div className="absolute inset-0 bg-black/40" onClick={() => setShowAIChat(false)} />
-              <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] animate-in slide-in-from-left duration-200">
+              <div
+                className="absolute inset-0 bg-black/40 transition-opacity duration-200"
+                onClick={() => setShowAIChat(false)}
+              />
+              <div
+                className="absolute inset-y-0 left-0 w-80 max-w-[85vw] shadow-xl transition-transform duration-200"
+                style={{ animation: 'slideInLeft 200ms ease-out' }}
+              >
                 <AIChatPanel open={true} onClose={() => setShowAIChat(false)} onApplyData={handleApplyAIData} />
               </div>
             </div>

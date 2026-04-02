@@ -106,12 +106,12 @@ function formatError(err: unknown): string {
 export interface AIParseResult {
   data: ParsedInvoiceData | null
   message: string | null
+  error: string | null
 }
 
 export function useAIParser() {
   const [settings, setSettings] = useState<AISettings | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     storage.getAISettings().then(setSettings)
@@ -127,12 +127,10 @@ export function useAIParser() {
     if (currentSettings) setSettings(currentSettings)
 
     if (!currentSettings?.apiKey) {
-      setError('Clé API manquante. Configurez-la dans Réglages → Mon profil.')
-      return { data: null, message: null }
+      return { data: null, message: null, error: 'Clé API manquante. Configurez-la dans Réglages → Mon profil.' }
     }
 
     setIsLoading(true)
-    setError(null)
 
     try {
       const ai = new GoogleGenAI({ apiKey: currentSettings.apiKey })
@@ -150,23 +148,22 @@ export function useAIParser() {
       // Si l'IA a renvoyé un message conversationnel
       const aiMessage = raw.message ? String(raw.message).trim() : null
       if (aiMessage) {
-        return { data: null, message: aiMessage }
+        return { data: null, message: aiMessage, error: null }
       }
 
       // Sinon, extraire les données de facture
       const parsed = validateParsedData(raw)
       if (!parsed) {
-        return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »' }
+        return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null }
       }
 
-      return { data: parsed, message: null }
+      return { data: parsed, message: null, error: null }
     } catch (err) {
-      setError(formatError(err))
-      return { data: null, message: null }
+      return { data: null, message: null, error: formatError(err) }
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  return { settings, updateSettings, parse, isLoading, error }
+  return { settings, updateSettings, parse, isLoading }
 }
