@@ -16,15 +16,21 @@ interface SpeechRecognitionEventType {
   resultIndex: number
 }
 
+interface SpeechRecognitionErrorEvent {
+  error: string
+  message?: string
+}
+
 interface SpeechRecognitionInstance {
   lang: string
   continuous: boolean
   interimResults: boolean
   onresult: ((event: SpeechRecognitionEventType) => void) | null
   onend: (() => void) | null
-  onerror: (() => void) | null
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
   start(): void
   stop(): void
+  abort(): void
 }
 
 declare global {
@@ -38,58 +44,102 @@ interface UseSpeechRecognitionOptions {
   onTranscript?: (text: string) => void
 }
 
+// Erreurs fatales qui doivent arrêter la reconnaissance
+const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'language-not-supported'])
+
 export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) {
   const [isListening, setIsListening] = useState(false)
   const [isSupported] = useState(() =>
     typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
   )
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const shouldRestartRef = useRef(false)
+  const transcriptRef = useRef('')
   const onTranscriptRef = useRef(options.onTranscript)
   useEffect(() => {
     onTranscriptRef.current = options.onTranscript
   })
 
-  const start = useCallback(() => {
-    if (!isSupported) return
-
+  const createRecognition = useCallback(() => {
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognitionClass()
     recognition.lang = 'fr-FR'
     recognition.continuous = true
     recognition.interimResults = true
 
-    let finalTranscript = ''
-
     recognition.onresult = (event: SpeechRecognitionEventType) => {
+      let final = ''
       let interim = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
-          finalTranscript += result[0].transcript
+          final += result[0].transcript
         } else {
           interim += result[0].transcript
         }
       }
-      onTranscriptRef.current?.(finalTranscript + interim)
+      transcriptRef.current = final
+      onTranscriptRef.current?.(final + interim)
+    }
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (FATAL_ERRORS.has(event.error)) {
+        // Erreur bloquante : arrêter complètement
+        shouldRestartRef.current = false
+        setIsListening(false)
+        recognitionRef.current = null
+      }
+      // Pour no-speech, aborted, network : on laisse onend relancer
     }
 
     recognition.onend = () => {
-      setIsListening(false)
+      if (shouldRestartRef.current) {
+        // Relancer automatiquement (silence, coupure réseau temporaire)
+        try {
+          recognition.start()
+        } catch {
+          // Si le restart échoue, on arrête proprement
+          shouldRestartRef.current = false
+          setIsListening(false)
+          recognitionRef.current = null
+        }
+      } else {
+        setIsListening(false)
+        recognitionRef.current = null
+      }
     }
 
-    recognition.onerror = () => {
-      setIsListening(false)
+    return recognition
+  }, [])
+
+  const start = useCallback(() => {
+    if (!isSupported) return
+
+    // Arrêter une session précédente si elle existe
+    if (recognitionRef.current) {
+      shouldRestartRef.current = false
+      recognitionRef.current.abort()
     }
 
+    const recognition = createRecognition()
     recognitionRef.current = recognition
-    recognition.start()
-    setIsListening(true)
-  }, [isSupported])
+    shouldRestartRef.current = true
+    transcriptRef.current = ''
+
+    try {
+      recognition.start()
+      setIsListening(true)
+    } catch {
+      setIsListening(false)
+      recognitionRef.current = null
+      shouldRestartRef.current = false
+    }
+  }, [isSupported, createRecognition])
 
   const stop = useCallback(() => {
+    shouldRestartRef.current = false
     if (recognitionRef.current) {
       recognitionRef.current.stop()
-      recognitionRef.current = null
     }
     setIsListening(false)
   }, [])
