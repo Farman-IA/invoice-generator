@@ -41,6 +41,10 @@ Règles TVA restauration France :
 Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 Les prix sont des nombres décimaux (30.00, pas "30 euros").`
 
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
 function sanitizeVatRate(rate: number): VatRate {
   if (VALID_VAT_RATES.includes(rate as VatRate)) return rate as VatRate
   return 20
@@ -57,7 +61,7 @@ function validateParsedData(raw: Record<string, unknown>): ParsedInvoiceData | n
           item && typeof item.description === 'string' && item.description.trim() !== ''
         )
         .map((item: Record<string, unknown>) => ({
-          description: String(item.description),
+          description: capitalize(String(item.description)),
           quantity: Math.max(1, Number(item.quantity) || 1),
           unitPrice: Math.max(0, Number(item.unitPrice) || 0),
           vatRate: sanitizeVatRate(Number(item.vatRate)),

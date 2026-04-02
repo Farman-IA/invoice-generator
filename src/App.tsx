@@ -181,7 +181,7 @@ function App() {
 
   const handleApplyAIData = useCallback((data: ParsedInvoiceData) => {
     const applyData = () => {
-      // Remplir le client
+      // Remplacer le client (reset complet puis remplissage)
       if (data.clientName) {
         const matches = findByName(data.clientName)
         if (matches.length > 0) {
@@ -197,20 +197,30 @@ function App() {
             codeService: match.codeService,
           })
         } else {
-          inv.updateClient({ companyName: data.clientName })
+          // Reset complet : vider les anciens champs
+          inv.updateClient({
+            companyName: data.clientName,
+            contactName: '',
+            address: '',
+            postalCode: '',
+            city: '',
+            siren: '',
+            tvaNumber: '',
+            codeService: '',
+          })
         }
       }
 
-      // Ajouter les lignes (vatRate déjà validé par useAIParser)
+      // Remplacer les lignes (pas ajouter) — vatRate déjà validé par useAIParser
       if (data.items?.length) {
-        data.items.forEach(item => {
-          inv.addLineItem({
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            vatRate: item.vatRate,
-          })
-        })
+        const newItems = data.items.map(item => ({
+          id: crypto.randomUUID(),
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          vatRate: item.vatRate,
+        }))
+        inv.updateInvoice({ items: newItems })
       }
 
       // Métadonnées
