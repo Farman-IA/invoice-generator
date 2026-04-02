@@ -52,13 +52,13 @@ export function getDefaultIssuer(): IssuerProfile {
 
 export function getDefaultClient(): ClientInfo {
   return {
-    companyName: 'Boulangerie Martin & Fils',
-    contactName: 'Claire Martin',
-    address: '45 avenue de la République',
-    postalCode: '54000',
-    city: 'Nancy',
-    siren: '823 456 789',
-    tvaNumber: 'FR 61 823456789',
+    companyName: '',
+    contactName: '',
+    address: '',
+    postalCode: '',
+    city: '',
+    siren: '',
+    tvaNumber: '',
     codeService: '',
   }
 }
@@ -83,33 +83,11 @@ export function getDefaultInvoice(counter: number): InvoiceData {
     issueDate: formatDate(today),
     deliveryDate: formatDate(today),
     dueDate: formatDate(dueDate),
-    purchaseOrder: 'BC-2026-042',
+    purchaseOrder: '',
     paymentTerms: 'Virement bancaire à 30 jours',
     notes: '',
     deposit: 0,
-    items: [
-      {
-        id: crypto.randomUUID(),
-        description: 'Création site vitrine WordPress (5 pages)',
-        quantity: 1,
-        unitPrice: 1800,
-        vatRate: 20,
-      },
-      {
-        id: crypto.randomUUID(),
-        description: 'Hébergement & nom de domaine (1 an)',
-        quantity: 1,
-        unitPrice: 120,
-        vatRate: 20,
-      },
-      {
-        id: crypto.randomUUID(),
-        description: 'Formation utilisation back-office (2h)',
-        quantity: 2,
-        unitPrice: 75,
-        vatRate: 20,
-      },
-    ],
+    items: [createDefaultLineItem()],
   }
 }
 
