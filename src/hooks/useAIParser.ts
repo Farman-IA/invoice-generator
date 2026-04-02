@@ -5,32 +5,38 @@ import type { AISettings, ParsedInvoiceData, VatRate, PriceMode } from '@/types/
 
 const VALID_VAT_RATES: VatRate[] = [5.5, 10, 20]
 
-const INVOICE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    message: { type: Type.STRING, description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
-    clientName: { type: Type.STRING, description: 'Nom du client ou de l\'entreprise' },
-    clientAddress: { type: Type.STRING, description: 'Adresse du client (rue)' },
-    clientPostalCode: { type: Type.STRING, description: 'Code postal du client' },
-    clientCity: { type: Type.STRING, description: 'Ville du client' },
-    contactName: { type: Type.STRING, description: 'Nom du contact chez le client' },
-    purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande' },
-    notes: { type: Type.STRING, description: 'Notes ou commentaires' },
-    items: {
-      type: Type.ARRAY,
+function buildInvoiceSchema(priceMode: PriceMode) {
+  const priceDesc = priceMode === 'ttc'
+    ? 'Prix unitaire TTC en euros (tel que donné par l\'utilisateur, NE PAS convertir)'
+    : 'Prix unitaire HT en euros'
+
+  return {
+    type: Type.OBJECT,
+    properties: {
+      message: { type: Type.STRING, description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
+      clientName: { type: Type.STRING, description: 'Nom du client ou de l\'entreprise' },
+      clientAddress: { type: Type.STRING, description: 'Adresse du client (rue)' },
+      clientPostalCode: { type: Type.STRING, description: 'Code postal du client' },
+      clientCity: { type: Type.STRING, description: 'Ville du client en MAJUSCULES' },
+      contactName: { type: Type.STRING, description: 'Nom du contact chez le client' },
+      purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande' },
+      notes: { type: Type.STRING, description: 'Notes ou commentaires' },
       items: {
-        type: Type.OBJECT,
-        properties: {
-          description: { type: Type.STRING, description: 'Description de la prestation ou du produit' },
-          quantity: { type: Type.NUMBER, description: 'Quantité' },
-          unitPrice: { type: Type.NUMBER, description: 'Prix unitaire HT en euros' },
-          vatRate: { type: Type.NUMBER, description: 'Taux de TVA : 5.5, 10 ou 20' },
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            description: { type: Type.STRING, description: 'Description de la prestation ou du produit' },
+            quantity: { type: Type.NUMBER, description: 'Quantité' },
+            unitPrice: { type: Type.NUMBER, description: priceDesc },
+            vatRate: { type: Type.NUMBER, description: 'Taux de TVA : 5.5, 10 ou 20' },
+          },
+          required: ['description', 'quantity', 'unitPrice', 'vatRate'],
         },
-        required: ['description', 'quantity', 'unitPrice', 'vatRate'],
       },
     },
-  },
-  required: ['message'],
+    required: ['message'],
+  }
 }
 
 function buildSystemPrompt(priceMode: PriceMode): string {
@@ -198,7 +204,7 @@ export function useAIParser() {
         contents,
         config: {
           responseMimeType: 'application/json',
-          responseSchema: INVOICE_SCHEMA,
+          responseSchema: buildInvoiceSchema(priceMode),
         },
       })
 
