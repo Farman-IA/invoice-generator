@@ -157,6 +157,35 @@ function formatError(err: unknown): string {
   return `Erreur lors de l'analyse. Réessayez. (${msg.substring(0, 80)})`
 }
 
+export interface ApiKeyValidationResult {
+  isValid: boolean
+  error: string | null
+}
+
+export async function validateApiKey(apiKey: string, model: AISettings['model'] = 'gemini-2.5-flash'): Promise<ApiKeyValidationResult> {
+  if (!apiKey.trim()) return { isValid: false, error: 'Clé API vide.' }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey })
+    await ai.models.generateContent({
+      model,
+      contents: 'Réponds juste "ok".',
+      config: { maxOutputTokens: 5 },
+    })
+    return { isValid: true, error: null }
+  } catch (err) {
+    if (!(err instanceof Error)) return { isValid: false, error: 'Erreur inconnue.' }
+    const msg = err.message.toLowerCase()
+    if (msg.includes('api key') || msg.includes('401') || msg.includes('unauthorized'))
+      return { isValid: false, error: 'Clé API invalide.' }
+    if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
+      return { isValid: true, error: null } // quota = clé valide mais limitée
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed'))
+      return { isValid: false, error: 'Erreur réseau. Vérifiez votre connexion.' }
+    return { isValid: false, error: `Erreur : ${err.message.substring(0, 80)}` }
+  }
+}
+
 export interface AIParseResult {
   data: ParsedInvoiceData | null
   message: string | null

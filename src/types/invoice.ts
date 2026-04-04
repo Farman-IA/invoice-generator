@@ -122,6 +122,7 @@ export type PriceMode = 'ht' | 'ttc'
 
 export interface AISettings {
   apiKey: string
+  apiKeyValid?: boolean
   model: 'gemini-2.5-flash' | 'gemini-2.5-pro'
   priceMode: PriceMode
 }

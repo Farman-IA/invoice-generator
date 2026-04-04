@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { storage } from '@/lib/storage'
+import { validateApiKey } from '@/hooks/useAIParser'
 import type { AISettings, PriceMode } from '@/types/invoice'
 
 interface AISettingsSectionProps {
@@ -23,6 +24,10 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
   const [model, setModel] = useState<AISettings['model']>('gemini-2.5-flash')
   const [priceMode, setPriceMode] = useState<PriceMode>('ht')
   const [showKey, setShowKey] = useState(false)
+  const [validating, setValidating] = useState(false)
+  const [keyValid, setKeyValid] = useState<boolean | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const prevKeyRef = useRef('')
 
   useEffect(() => {
     storage.getAISettings().then(settings => {
@@ -30,18 +35,39 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
         setApiKey(settings.apiKey)
         setModel(settings.model)
         setPriceMode(settings.priceMode ?? 'ht')
+        setKeyValid(settings.apiKeyValid ?? null)
+        prevKeyRef.current = settings.apiKey
       }
     })
   }, [])
 
-  const save = (key: string, mod: AISettings['model'], price: PriceMode) => {
-    const newSettings: AISettings = { apiKey: key, model: mod, priceMode: price }
+  const save = (key: string, mod: AISettings['model'], price: PriceMode, valid?: boolean) => {
+    const newSettings: AISettings = { apiKey: key, apiKeyValid: valid ?? keyValid ?? undefined, model: mod, priceMode: price }
     storage.saveAISettings(newSettings)
     onSettingsChange?.(newSettings)
   }
 
-  const handleApiKeyBlur = () => {
-    save(apiKey, model, priceMode)
+  const handleApiKeyBlur = async () => {
+    const trimmed = apiKey.trim()
+    if (!trimmed) {
+      setKeyValid(null)
+      setValidationError(null)
+      save(trimmed, model, priceMode, undefined)
+      prevKeyRef.current = trimmed
+      return
+    }
+    if (trimmed === prevKeyRef.current && keyValid !== null) {
+      save(trimmed, model, priceMode, keyValid)
+      return
+    }
+    setValidating(true)
+    setValidationError(null)
+    const result = await validateApiKey(trimmed, model)
+    setKeyValid(result.isValid)
+    setValidationError(result.error)
+    setValidating(false)
+    save(trimmed, model, priceMode, result.isValid)
+    prevKeyRef.current = trimmed
   }
 
   const handleModelChange = (value: AISettings['model']) => {
@@ -67,21 +93,36 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
               id="ai-api-key"
               type={showKey ? 'text' : 'password'}
               value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
+              onChange={e => { setApiKey(e.target.value); if (keyValid !== null) setKeyValid(null) }}
               onBlur={handleApiKeyBlur}
               placeholder="AIza..."
-              className="w-full px-2 py-1.5 pr-9 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+              className={`w-full px-2 py-1.5 pr-16 text-sm border rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 ${
+                keyValid === true ? 'border-green-400 dark:border-green-600 focus:ring-green-200 dark:focus:ring-green-800'
+                : keyValid === false ? 'border-red-400 dark:border-red-600 focus:ring-red-200 dark:focus:ring-red-800'
+                : 'border-gray-200 dark:border-gray-700 focus:ring-blue-200 dark:focus:ring-blue-800'
+              }`}
             />
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              type="button"
-              onClick={() => setShowKey(s => !s)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400"
-            >
-              {showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-            </Button>
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              {validating && <Loader2 className="size-3.5 animate-spin text-blue-500" />}
+              {!validating && keyValid === true && <CheckCircle2 className="size-3.5 text-green-500" />}
+              {!validating && keyValid === false && <XCircle className="size-3.5 text-red-500" />}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                type="button"
+                onClick={() => setShowKey(s => !s)}
+                className="text-gray-400"
+              >
+                {showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              </Button>
+            </div>
           </div>
+          {validationError && keyValid === false && (
+            <p className="text-[11px] text-red-500 dark:text-red-400 mt-0.5">{validationError}</p>
+          )}
+          {keyValid === true && (
+            <p className="text-[11px] text-green-600 dark:text-green-400 mt-0.5">Clé API valide ✓</p>
+          )}
         </div>
         <div className="col-span-2">
           <label htmlFor="ai-model" className="text-xs text-gray-500 dark:text-gray-400">Modèle IA</label>

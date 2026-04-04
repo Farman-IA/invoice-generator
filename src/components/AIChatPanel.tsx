@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Mic, MicOff, X, Sparkles, Loader2, RotateCcw, Check, Pencil } from 'lucide-react'
+import { Send, Mic, MicOff, X, Sparkles, Loader2, RotateCcw, Check, Pencil, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useAIParser } from '@/hooks/useAIParser'
+import { useAIParser, validateApiKey } from '@/hooks/useAIParser'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { storage } from '@/lib/storage'
 import type { ParsedInvoiceData } from '@/types/invoice'
 
 interface ChatMessage {
@@ -168,7 +169,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retryAttemptRef = useRef(0)
-  const { parse, isLoading, settings } = useAIParser()
+  const { parse, isLoading, settings, updateSettings } = useAIParser()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastUserTextRef = useRef('')
@@ -300,9 +301,39 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     }
   }
 
+  const [inlineKey, setInlineKey] = useState('')
+  const [inlineShowKey, setInlineShowKey] = useState(false)
+  const [inlineValidating, setInlineValidating] = useState(false)
+  const [inlineError, setInlineError] = useState<string | null>(null)
+
+  const handleInlineKeySave = async () => {
+    const trimmed = inlineKey.trim()
+    if (!trimmed) return
+    setInlineValidating(true)
+    setInlineError(null)
+    const result = await validateApiKey(trimmed)
+    setInlineValidating(false)
+    if (result.isValid) {
+      const current = await storage.getAISettings()
+      const newSettings = {
+        apiKey: trimmed,
+        apiKeyValid: true,
+        model: current?.model ?? 'gemini-2.5-flash' as const,
+        priceMode: current?.priceMode ?? 'ht' as const,
+      }
+      await storage.saveAISettings(newSettings)
+      // Refresh les settings du parser
+      updateSettings(newSettings)
+      setInlineKey('')
+      setInlineError(null)
+    } else {
+      setInlineError(result.error ?? 'Clé invalide.')
+    }
+  }
+
   if (!open) return null
 
-  const hasApiKey = !!settings?.apiKey
+  const hasValidKey = !!settings?.apiKey && settings.apiKeyValid !== false
   const lastMessage = messages[messages.length - 1]
   const showRetryButton = lastMessage?.role === 'error' && lastMessage.isRetryable
 
@@ -395,10 +426,44 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
 
       {/* Input */}
       <div className="border-t border-gray-200 dark:border-gray-800 p-3">
-        {!hasApiKey ? (
-          <p className="text-xs text-center text-amber-600 dark:text-amber-400 py-2">
-            Configurez votre clé API Google dans Réglages → Mon profil
-          </p>
+        {!hasValidKey ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+              <KeyRound className="size-3.5" />
+              <p className="text-xs font-medium">Clé API Google requise</p>
+            </div>
+            <div className="relative">
+              <input
+                type={inlineShowKey ? 'text' : 'password'}
+                value={inlineKey}
+                onChange={e => { setInlineKey(e.target.value); setInlineError(null) }}
+                onKeyDown={e => { if (e.key === 'Enter') handleInlineKeySave() }}
+                placeholder="Collez votre clé API (AIza...)"
+                disabled={inlineValidating}
+                className="w-full px-2 py-1.5 pr-8 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+              />
+              <button
+                type="button"
+                onClick={() => setInlineShowKey(s => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {inlineShowKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              </button>
+            </div>
+            {inlineError && <p className="text-[11px] text-red-500">{inlineError}</p>}
+            <Button
+              size="sm"
+              onClick={handleInlineKeySave}
+              disabled={!inlineKey.trim() || inlineValidating}
+              className="w-full h-7 text-xs"
+            >
+              {inlineValidating ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Check className="size-3 mr-1" />}
+              {inlineValidating ? 'Vérification...' : 'Valider la clé'}
+            </Button>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center">
+              La clé est stockée uniquement dans votre navigateur
+            </p>
+          </div>
         ) : (
           <div className="flex items-end gap-2">
             <textarea
