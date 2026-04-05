@@ -68,18 +68,20 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
     recognition.interimResults = true
 
     recognition.onresult = (event: SpeechRecognitionEventType) => {
-      let final = ''
-      let interim = ''
+      const finals: string[] = []
+      const interims: string[] = []
       for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
-          final += result[0].transcript
+          finals.push(result[0].transcript.trim())
         } else {
-          interim += result[0].transcript
+          interims.push(result[0].transcript.trim())
         }
       }
+      const final = finals.filter(Boolean).join(' ')
+      const interim = interims.filter(Boolean).join(' ')
       transcriptRef.current = final
-      onTranscriptRef.current?.(final + interim)
+      onTranscriptRef.current?.(final + (interim ? ' ' + interim : ''))
     }
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {

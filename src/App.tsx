@@ -189,9 +189,13 @@ function App() {
   }
 
   const handleApplyAIData = useCallback((data: ParsedInvoiceData) => {
+    const isNewInvoice = view !== 'EDIT'
+    const hasClient = data.clientName && data.clientName.trim() !== ''
+    const hasItems = data.items?.length > 0
+
     const applyData = () => {
-      // Remplacer le client (reset complet puis remplissage)
-      if (data.clientName) {
+      // Client : fusionner au lieu de remplacer
+      if (hasClient) {
         const matches = findByName(data.clientName)
         if (matches.length > 0) {
           const match = matches[0]
@@ -205,8 +209,8 @@ function App() {
             tvaNumber: match.tvaNumber,
             codeService: match.codeService,
           })
-        } else {
-          // Reset complet + remplir avec les infos de l'IA
+        } else if (isNewInvoice) {
+          // Nouvelle facture : remplir tout
           inv.updateClient({
             companyName: data.clientName,
             contactName: data.contactName ?? '',
@@ -217,11 +221,19 @@ function App() {
             tvaNumber: '',
             codeService: '',
           })
+        } else {
+          // Modification : ne toucher QUE les champs fournis par l'IA
+          const clientUpdate: Partial<ClientInfo> = { companyName: data.clientName }
+          if (data.contactName) clientUpdate.contactName = data.contactName
+          if (data.clientAddress) clientUpdate.address = data.clientAddress
+          if (data.clientPostalCode) clientUpdate.postalCode = data.clientPostalCode
+          if (data.clientCity) clientUpdate.city = data.clientCity
+          inv.updateClient(clientUpdate)
         }
       }
 
-      // Remplacer les lignes (pas ajouter) — vatRate déjà validé par useAIParser
-      if (data.items?.length) {
+      // Articles
+      if (hasItems) {
         const newItems = data.items.map(item => ({
           id: crypto.randomUUID(),
           description: item.description,
@@ -230,7 +242,19 @@ function App() {
           ...(item.unitPriceTTC != null ? { unitPriceTTC: item.unitPriceTTC } : {}),
           vatRate: item.vatRate,
         }))
-        inv.updateInvoice({ items: newItems })
+
+        if (isNewInvoice || !hasClient) {
+          // Nouvelle facture OU modification d'articles seuls → remplacer si nouvelle, ajouter si modification
+          if (isNewInvoice) {
+            inv.updateInvoice({ items: newItems })
+          } else {
+            // Modification : ajouter les nouveaux articles aux existants
+            inv.updateInvoice({ items: [...inv.state.invoice.items, ...newItems] })
+          }
+        } else {
+          // L'IA a fourni client ET articles → c'est une description complete, remplacer
+          inv.updateInvoice({ items: newItems })
+        }
       }
 
       // Métadonnées
@@ -245,7 +269,7 @@ function App() {
     }
 
     // Si pas en mode édition, créer une nouvelle facture et attendre le rendu
-    if (view !== 'EDIT') {
+    if (isNewInvoice) {
       inv.newInvoice().then(() => {
         setGlobalView('EDIT')
         setTimeout(applyData, 0)

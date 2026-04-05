@@ -24,3 +24,13 @@ createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// Enregistrer le service worker pour que l'app fonctionne comme une vraie PWA
+// (les donnees persistent meme quand on ferme et reouvre l'app)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Silently ignore — l'app fonctionne quand meme sans SW
+    })
+  })
+}

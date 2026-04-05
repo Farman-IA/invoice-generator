@@ -86,11 +86,23 @@ Exemples de questions → répondre avec message :
 - Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 - Les prix sont des nombres décimaux (30.00, pas "30 euros").
 
+## MODIFICATIONS d'une facture existante :
+Quand le texte demande une MODIFICATION (changer, modifier, remplacer, mettre à jour, corriger) :
+- Ne remplis QUE les champs à modifier, laisse les autres VIDES ou absents
+- "Change le client en Mairie de Metz" → clientName: "Mairie de Metz", PAS d'items
+- "Ajoute 2 cafés à 3€" → items avec les nouveaux articles SEULEMENT, PAS de clientName
+- "Change le prix du repas à 35€" → items avec l'article modifié, PAS de clientName
+- IMPORTANT : ne remplis JAMAIS des champs qui ne sont pas mentionnés dans la demande de modification
+
 ## Exemples complets de parsing :
 - "Facture pour Adele Suty, 3 rue du Golf, Aingeray, 1 repas à 30€ et 2 bouteilles de vin à 25€" →
   clientName: "Adele Suty", clientAddress: "3 rue du Golf", clientCity: "AINGERAY", contactName: "Adele SUTY", items: [{description: "Repas", quantity: 1, unitPrice: 30, vatRate: 10}, {description: "Bouteille de vin", quantity: 2, unitPrice: 25, vatRate: 20}]
 - "308 sandwichs à 8€ pour l'Université de Lorraine" →
-  clientName: "Université de Lorraine", items: [{description: "Sandwich", quantity: 308, unitPrice: 8, vatRate: 5.5}]`
+  clientName: "Université de Lorraine", items: [{description: "Sandwich", quantity: 308, unitPrice: 8, vatRate: 5.5}]
+- "Change le client en Mairie de Metz" →
+  clientName: "Mairie de Metz" (PAS d'items, PAS d'adresse sauf si mentionnée)
+- "Ajoute 5 jus d'orange à 4€" →
+  items: [{description: "Jus d'orange", quantity: 5, unitPrice: 4, vatRate: 10}] (PAS de clientName)`
 }
 
 function capitalize(str: string): string {
@@ -108,7 +120,10 @@ function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
 }
 
 function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {
-  if (!raw.clientName && (!Array.isArray(raw.items) || raw.items.length === 0)) {
+  const hasClient = raw.clientName && String(raw.clientName).trim() !== ''
+  const hasItems = Array.isArray(raw.items) && raw.items.length > 0
+
+  if (!hasClient && !hasItems) {
     return null
   }
 
@@ -132,7 +147,7 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
     : []
 
   return {
-    clientName: String(raw.clientName ?? ''),
+    clientName: hasClient ? String(raw.clientName) : '',
     clientAddress: raw.clientAddress ? String(raw.clientAddress) : undefined,
     clientPostalCode: raw.clientPostalCode ? String(raw.clientPostalCode) : undefined,
     clientCity: raw.clientCity ? String(raw.clientCity).toUpperCase() : undefined,

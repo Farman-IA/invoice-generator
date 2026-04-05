@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import { toast } from 'sonner'
 
 function sanitizeFilename(str: string): string {
   return str
@@ -204,7 +205,12 @@ export async function generatePDF(
       scale: 2,
       useCORS: true,
       logging: false,
-    })
+    }).catch(() => null)
+
+    if (!canvas) {
+      toast.error('Erreur lors de la capture du document. Réessayez.')
+      return
+    }
 
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -270,7 +276,21 @@ export async function generatePDF(
       }
     }
 
-    pdf.save(filename)
+    // En mode PWA (raccourci Dock), pdf.save() ne fonctionne pas car Safari
+    // bloque le telechargement via <a download>. On ouvre le PDF dans un nouvel onglet.
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || ('standalone' in window.navigator && (window.navigator as unknown as { standalone: boolean }).standalone)
+
+    if (isStandalone) {
+      const blob = pdf.output('blob')
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } else {
+      pdf.save(filename)
+    }
+  } catch {
+    toast.error('Erreur lors de la génération du PDF. Réessayez.')
   } finally {
     restoreColors()
     element.querySelectorAll<HTMLElement>('.pdf-vat-select').forEach((el) => {
