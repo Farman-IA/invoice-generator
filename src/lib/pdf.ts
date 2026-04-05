@@ -1,23 +1,32 @@
 import { toast } from 'sonner'
 
-/**
- * Génère un PDF via la boîte de dialogue d'impression du navigateur.
- *
- * Pourquoi window.print() au lieu de html2canvas + jsPDF ?
- * → html2canvas ne supporte pas les couleurs oklch() de Tailwind CSS v4,
- *   ce qui fait crasher la capture. window.print() utilise le moteur
- *   de rendu natif du navigateur qui gère toutes les CSS modernes.
- *
- * Le CSS @media print dans index.css cache automatiquement
- * le header, le chat, les boutons, et les champs vides.
- * L'utilisateur choisit "Enregistrer en PDF" dans la boîte de dialogue.
- */
+function sanitizeFilename(str: string): string {
+  return str
+    .replace(/[^a-zA-Z0-9àâäéèêëïîôùûüÿçœæ\s-]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .trim()
+}
+
 export async function generatePDF(
   _element: HTMLElement,
-  _invoiceNumber: string,
-  _clientName: string,
-  _type: 'invoice' | 'quote' = 'invoice'
+  invoiceNumber: string,
+  clientName: string,
+  type: 'invoice' | 'quote' = 'invoice'
 ): Promise<void> {
+  const date = new Date().toISOString().split('T')[0]
+  const prefix = type === 'invoice' ? 'Facture' : 'Devis'
+  const cleanClient = sanitizeFilename(clientName) || 'Client'
+  const cleanNumber = sanitizeFilename(invoiceNumber) || prefix
+
+  // Le nom du fichier dans "Enregistrer sous" vient du <title> de la page
+  const originalTitle = document.title
+  document.title = `${prefix}_${cleanNumber}_${cleanClient}_${date}`
+
   window.print()
+
+  // Restaurer le titre après l'impression
+  setTimeout(() => { document.title = originalTitle }, 500)
+
   toast.success('Utilisez "Enregistrer en PDF" dans la boîte de dialogue')
 }
