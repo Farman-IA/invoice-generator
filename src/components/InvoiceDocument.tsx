@@ -132,7 +132,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
             <div
               onClick={() => logoInputRef.current?.click()}
               className={cn(
-                "w-48 h-24 mb-3 rounded-lg flex items-center justify-center cursor-pointer transition-colors overflow-hidden",
+                "w-56 h-28 mb-3 rounded-lg flex items-center justify-center cursor-pointer transition-colors overflow-hidden",
                 logo
                   ? "border-0 hover:opacity-80"
                   : "border-2 border-dashed border-gray-200 hover:border-gray-400 hover:bg-gray-50"
