@@ -135,6 +135,7 @@ export interface ParsedInvoiceData {
   contactName?: string
   purchaseOrder?: string
   notes?: string
+  deposit?: number
   items: {
     description: string
     quantity: number

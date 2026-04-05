@@ -276,19 +276,21 @@ export async function generatePDF(
       }
     }
 
-    // En mode PWA (raccourci Dock), pdf.save() ne fonctionne pas car Safari
-    // bloque le telechargement via <a download>. On ouvre le PDF dans un nouvel onglet.
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-      || ('standalone' in window.navigator && (window.navigator as unknown as { standalone: boolean }).standalone)
+    // Téléchargement robuste : blob + lien invisible (fonctionne partout, y compris PWA)
+    const blob = pdf.output('blob')
+    const blobUrl = URL.createObjectURL(blob)
 
-    if (isStandalone) {
-      const blob = pdf.output('blob')
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
-      setTimeout(() => URL.revokeObjectURL(url), 30000)
-    } else {
-      pdf.save(filename)
-    }
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    // Nettoyage différé pour laisser le navigateur démarrer le téléchargement
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000)
+    toast.success(`PDF "${filename}" généré`)
   } catch {
     toast.error('Erreur lors de la génération du PDF. Réessayez.')
   } finally {

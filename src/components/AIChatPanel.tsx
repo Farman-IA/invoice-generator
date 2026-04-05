@@ -35,6 +35,7 @@ function formatAppliedData(data: ParsedInvoiceData): string {
       lines.push(`+ ${item.quantity} × ${item.description} — ${item.unitPrice.toFixed(2)}€ HT — TVA ${item.vatRate}%`)
     })
   }
+  if (data.deposit != null && data.deposit > 0) lines.push(`Acompte à déduire : ${data.deposit.toFixed(2)}€`)
   if (data.notes) lines.push(`Notes : ${data.notes}`)
   return lines.join('\n')
 }

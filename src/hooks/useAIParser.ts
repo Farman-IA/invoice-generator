@@ -21,6 +21,7 @@ function buildInvoiceSchema(priceMode: PriceMode) {
       contactName: { type: Type.STRING, description: 'Nom du contact chez le client' },
       purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande' },
       notes: { type: Type.STRING, description: 'Notes ou commentaires' },
+      deposit: { type: Type.NUMBER, description: 'Montant de l\'acompte déjà versé par le client, en euros. 0 si aucun acompte.' },
       items: {
         type: Type.ARRAY,
         items: {
@@ -82,6 +83,12 @@ Exemples de questions → répondre avec message :
 - Si le texte est ambigu, préférer laisser un champ vide plutôt qu'inventer une valeur fausse
 - Bien séparer nom du client, adresse, ville : ce sont des informations distinctes
 
+## Acompte :
+- Si l'utilisateur mentionne un acompte (acompte, avance, déjà versé, déjà payé, à déduire), mets le montant dans "deposit"
+- Exemples : "acompte de 500€" → deposit: 500, "avec un acompte déjà versé de 200€" → deposit: 200
+- L'acompte est un montant en euros à DÉDUIRE du total TTC. Ce n'est PAS un article/ligne de facture.
+- Ne mets JAMAIS l'acompte dans les items ou dans les notes — utilise UNIQUEMENT le champ "deposit"
+
 ## Règles de formatage :
 - Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 - Les prix sont des nombres décimaux (30.00, pas "30 euros").
@@ -122,8 +129,9 @@ function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
 function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {
   const hasClient = raw.clientName && String(raw.clientName).trim() !== ''
   const hasItems = Array.isArray(raw.items) && raw.items.length > 0
+  const hasDeposit = typeof raw.deposit === 'number' && raw.deposit > 0
 
-  if (!hasClient && !hasItems) {
+  if (!hasClient && !hasItems && !hasDeposit) {
     return null
   }
 
@@ -146,6 +154,8 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
         })
     : []
 
+  const depositValue = Number(raw.deposit) || 0
+
   return {
     clientName: hasClient ? String(raw.clientName) : '',
     clientAddress: raw.clientAddress ? String(raw.clientAddress) : undefined,
@@ -154,6 +164,7 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
     contactName: raw.contactName ? String(raw.contactName) : undefined,
     purchaseOrder: raw.purchaseOrder ? String(raw.purchaseOrder) : undefined,
     notes: raw.notes ? String(raw.notes) : undefined,
+    ...(depositValue > 0 ? { deposit: depositValue } : {}),
     items,
   }
 }

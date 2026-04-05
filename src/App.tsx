@@ -28,7 +28,7 @@ import { useArticleTemplates } from '@/hooks/useArticleTemplates'
 import { useTheme } from '@/hooks/useTheme'
 import { generatePDF } from '@/lib/pdf'
 import { storage } from '@/lib/storage'
-import type { ClientInfo, LineItem, ArticleTemplate, VatRate, AppView, ParsedInvoiceData } from '@/types/invoice'
+import type { ClientInfo, InvoiceData, LineItem, ArticleTemplate, VatRate, AppView, ParsedInvoiceData } from '@/types/invoice'
 
 function App() {
   // Factures
@@ -257,12 +257,13 @@ function App() {
         }
       }
 
-      // Métadonnées
-      if (data.purchaseOrder || data.notes) {
-        inv.updateInvoice({
-          ...(data.purchaseOrder && { purchaseOrder: data.purchaseOrder }),
-          ...(data.notes && { notes: data.notes }),
-        })
+      // Métadonnées et acompte
+      const metaUpdate: Partial<InvoiceData> = {}
+      if (data.purchaseOrder) metaUpdate.purchaseOrder = data.purchaseOrder
+      if (data.notes) metaUpdate.notes = data.notes
+      if (data.deposit != null && data.deposit > 0) metaUpdate.deposit = data.deposit
+      if (Object.keys(metaUpdate).length > 0) {
+        inv.updateInvoice(metaUpdate)
       }
 
       toast.success('Facture mise à jour par l\'IA')
