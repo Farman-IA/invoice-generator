@@ -169,6 +169,11 @@
   .invoice-paper > div:first-child {
     margin-bottom: 1.2rem !important;
   }
+  /* Logo : taille pro pour A4 */
+  .invoice-paper > div:first-child > div:first-child > div:first-child {
+    width: 12rem !important;
+    height: 5rem !important;
+  }
   .invoice-paper h1 {
     font-size: 1.6rem !important;
     letter-spacing: 0.05em !important;
