@@ -82,28 +82,12 @@ function App() {
   }
 
   const handleFinalize = async () => {
-    const num = inv.state.invoice.number
-    const client = inv.state.client.companyName
-    const ok = await inv.finalizeInvoice()
-    if (ok) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => { if (docRef.current) generatePDF(docRef.current, num, client, 'invoice') })
-      })
-    }
+    await inv.finalizeInvoice()
   }
 
   const handleGalleryDownload = (id: string) => {
-    const invoice = inv.savedInvoices.find(i => i.id === id)
-    if (!invoice) return
-    const num = invoice.invoice.number
-    const client = invoice.client.companyName
     inv.loadInvoice(id)
     setGlobalView('EDIT')
-    requestAnimationFrame(() => {
-      requestAnimationFrame(async () => {
-        if (docRef.current) { await generatePDF(docRef.current, num, client, 'invoice'); setGlobalView('GALLERY') }
-      })
-    })
   }
 
   const handleSaveInvoice = async () => {
@@ -130,17 +114,8 @@ function App() {
   }
 
   const handleQuoteDownload = (id: string) => {
-    const quote = qt.savedQuotes.find(q => q.id === id)
-    if (!quote) return
-    const num = quote.quote.number
-    const client = quote.client.companyName
     qt.loadQuote(id)
     setGlobalView('QUOTE_EDIT')
-    requestAnimationFrame(() => {
-      requestAnimationFrame(async () => {
-        if (docRef.current) { await generatePDF(docRef.current, num, client, 'quote'); setGlobalView('QUOTE_GALLERY') }
-      })
-    })
   }
 
   const handleQuotePDF = async () => {
@@ -348,8 +323,7 @@ function App() {
                   Sauvegarder
                 </Button>
                 <Button size="sm" onClick={() => setShowFinalizeConfirm(true)}>
-                  <Download className="size-4 mr-1" />
-                  Finaliser & PDF
+                  Finaliser
                 </Button>
               </>
             )}
