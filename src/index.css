@@ -138,7 +138,10 @@
   /* ===== CACHER TOUT SAUF LA FACTURE ===== */
   .no-print,
   [data-sonner-toaster],
-  .no-print-pdf {
+  .no-print-pdf,
+  [role="dialog"],
+  [data-slot="dialog-overlay"],
+  .fixed {
     display: none !important;
   }
 
