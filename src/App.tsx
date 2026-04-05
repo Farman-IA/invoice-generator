@@ -472,7 +472,7 @@ function App() {
       {view === 'EDIT' && (
         <div className="flex">
           {/* Chat IA — desktop sidebar */}
-          <div className="hidden lg:block w-80 xl:w-96 flex-shrink-0 sticky top-[53px] h-[calc(100vh-53px)]">
+          <div className="hidden lg:block w-80 xl:w-96 flex-shrink-0 sticky top-[53px] h-[calc(100vh-53px)] no-print">
             <AIChatPanel open onClose={() => {}} onApplyData={handleApplyAIData} />
           </div>
 

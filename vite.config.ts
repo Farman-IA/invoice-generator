@@ -18,9 +18,6 @@ export default defineConfig({
           if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/")) {
             return "react"
           }
-          if (id.includes("node_modules/jspdf") || id.includes("node_modules/html2canvas")) {
-            return "pdf"
-          }
           if (id.includes("node_modules/lucide-react") || id.includes("node_modules/class-variance-authority") || id.includes("node_modules/clsx") || id.includes("node_modules/tailwind-merge")) {
             return "ui"
           }

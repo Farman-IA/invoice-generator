@@ -135,19 +135,64 @@
 }
 
 @media print {
-  .no-print {
+  /* Cacher tout sauf la facture */
+  .no-print,
+  [data-sonner-toaster],
+  .no-print-pdf {
     display: none !important;
   }
 
   body {
     background: white !important;
+    color: #1a1a1a !important;
   }
 
+  /* Facture pleine page */
   .invoice-paper {
     box-shadow: none !important;
     margin: 0 !important;
     padding: 8mm !important;
     max-width: 100% !important;
+  }
+
+  /* Compacter les marges pour tenir sur une page A4 */
+  .invoice-paper > .mb-10 {
+    margin-bottom: 1.5rem !important;
+  }
+  .invoice-paper > .mb-8 {
+    margin-bottom: 1rem !important;
+  }
+  .invoice-paper > .mt-12 {
+    margin-top: 1.5rem !important;
+  }
+
+  /* Cacher les elements interactifs */
+  button:not([data-slot="select-trigger"]) {
+    display: none !important;
+  }
+  [data-slot="select-trigger"] svg {
+    display: none !important;
+  }
+
+  /* Cacher les champs vides et placeholders */
+  [data-empty],
+  tr[data-empty-line],
+  span.italic.text-gray-400 {
+    display: none !important;
+  }
+
+  /* TVA : afficher le texte, cacher le select */
+  .pdf-vat-select {
+    display: none !important;
+  }
+  .pdf-vat-text {
+    display: block !important;
+    text-align: center !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm;
   }
 }
 
