@@ -126,13 +126,13 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
         className="invoice-paper max-w-[210mm] mx-auto bg-white shadow-xl p-12 text-gray-900 text-sm leading-relaxed print:shadow-none print:p-0 print:max-w-full"
       >
         {/* ========== HEADER ========== */}
-        <div className="flex justify-between items-start mb-10">
-          {/* Logo + Company info */}
-          <div className="space-y-1">
+        <div className="flex justify-between items-center mb-10">
+          {/* Logo */}
+          <div>
             <div
               onClick={() => logoInputRef.current?.click()}
               className={cn(
-                "w-56 h-28 mb-3 rounded-lg flex items-center justify-center cursor-pointer transition-colors overflow-hidden",
+                "w-56 h-28 rounded-lg flex items-center justify-start cursor-pointer transition-colors overflow-hidden",
                 logo
                   ? "border-0 hover:opacity-80"
                   : "border-2 border-dashed border-gray-200 hover:border-gray-400 hover:bg-gray-50"
@@ -141,7 +141,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               {logo ? (
                 <img src={logo} alt="Logo" className="max-w-full max-h-full object-contain" />
               ) : (
-                <div className="text-gray-400 flex flex-col items-center gap-1">
+                <div className="text-gray-400 flex flex-col items-center justify-center w-full h-full gap-1">
                   <ImagePlus className="size-5" />
                   <span className="text-xs">Logo</span>
                 </div>
