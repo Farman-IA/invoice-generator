@@ -113,6 +113,24 @@ export function useInvoice() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
+  // Sauvegarde automatique de la facture en cours (debounced 2s)
+  const autoSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (isLoading) return
+    // Ne pas auto-sauvegarder si le client est vide (facture vierge)
+    if (!state.client.companyName.trim()) return
+    // Ne pas auto-sauvegarder si déjà finalisée
+    if (currentInvoiceId && savedInvoices.find(i => i.id === currentInvoiceId)?.status === 'finalisée') return
+
+    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+    autoSaveTimeout.current = setTimeout(() => {
+      upsertAndPersist('brouillon')
+    }, 2000)
+    return () => {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+    }
+  }, [state.client, state.invoice, isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Persister le profil émetteur à chaque modification (debounced)
   const issuerSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -126,12 +144,37 @@ export function useInvoice() {
     }
   }, [state.issuer, isLoading])
 
-  // Sauvegarder le profil émetteur avant de fermer l'onglet
+  // Sauvegarder le profil émetteur et la facture en cours avant de fermer l'onglet
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (issuerSaveTimeout.current) {
         clearTimeout(issuerSaveTimeout.current)
         storage.saveIssuerProfile(stateRef.current.issuer)
+      }
+      // Sauvegarder la facture en cours si elle a du contenu
+      if (autoSaveTimeout.current) {
+        clearTimeout(autoSaveTimeout.current)
+      }
+      if (stateRef.current.client.companyName.trim()) {
+        const now = new Date().toISOString()
+        const current = stateRef.current
+        const invoiceId = currentInvoiceIdRef.current
+        let updated: SavedInvoice[]
+        if (invoiceId) {
+          updated = savedInvoicesRef.current.map(inv =>
+            inv.id === invoiceId
+              ? { ...inv, issuer: current.issuer, client: current.client, invoice: current.invoice, updatedAt: now }
+              : inv
+          )
+        } else {
+          const newInvoice: SavedInvoice = {
+            id: crypto.randomUUID(), issuer: current.issuer, client: current.client,
+            invoice: current.invoice, status: 'brouillon', createdAt: now, updatedAt: now,
+          }
+          updated = [newInvoice, ...savedInvoicesRef.current]
+        }
+        storage.saveInvoices(updated)
+        storage.saveCounter(current.counter)
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
