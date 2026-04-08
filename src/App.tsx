@@ -289,8 +289,8 @@ function App() {
             </Button>
             <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 self-center" />
             <Button variant={view === 'EDIT' ? 'default' : 'ghost'} size="sm"
-              onClick={() => setGlobalView('EDIT')}>
-              <FileText className="size-4 mr-1" />
+              onClick={async () => { await inv.newInvoice(); setGlobalView('EDIT') }}>
+              <Plus className="size-4 mr-1" />
               Facture
             </Button>
             <Button variant={view === 'GALLERY' ? 'default' : 'ghost'} size="sm"
@@ -338,10 +338,16 @@ function App() {
               </>
             )}
             {view === 'EDIT' && inv.isFinalized && (
-              <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
-                <Download className="size-4 mr-1" />
-                Télécharger PDF
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
+                  <Download className="size-4 mr-1" />
+                  Télécharger PDF
+                </Button>
+                <Button size="sm" onClick={async () => { await inv.newInvoice(); setGlobalView('EDIT') }}>
+                  <Plus className="size-4 mr-1" />
+                  Nouvelle facture
+                </Button>
+              </>
             )}
 
             {/* Devis : édition */}
