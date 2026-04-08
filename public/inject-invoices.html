@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Inject</title></head>
+<body><pre id="o">...</pre>
+<script>
+const newInvoices = [
+  {
+    id: crypto.randomUUID(),
+    issuer: JSON.parse(localStorage.getItem('issuer-profile') || '{}'),
+    client: {
+      companyName: "Université de Lorraine",
+      contactName: "Agence Comptable/Bureau Facturier",
+      address: "91 Avenue de la Libération",
+      postalCode: "54021",
+      city: "NANCY CEDEX",
+      siren: "13001550600012",
+      tvaNumber: "FR24130015506",
+      codeService: "UL1AVECEJ"
+    },
+    invoice: {
+      number: "FAC-2026-036",
+      issueDate: "2026-04-08",
+      deliveryDate: "2026-04-08",
+      dueDate: "2026-05-08",
+      purchaseOrder: "4500821931",
+      paymentTerms: "Virement bancaire à 30 jours",
+      notes: "",
+      deposit: 0,
+      items: [
+        { id: crypto.randomUUID(), description: "Repas complet", quantity: 4, unitPrice: 29.93, vatRate: 10 },
+        { id: crypto.randomUUID(), description: "Boisson (TVA 20 %)", quantity: 1, unitPrice: 12.83, vatRate: 20 }
+      ]
+    },
+    status: "brouillon",
+    createdAt: "2026-04-08T14:38:00.000Z",
+    updatedAt: "2026-04-08T14:38:00.000Z"
+  },
+  {
+    id: crypto.randomUUID(),
+    issuer: JSON.parse(localStorage.getItem('issuer-profile') || '{}'),
+    client: {
+      companyName: "APAVE Exploitation France",
+      contactName: "",
+      address: "ZI Avenue Gay Lussac BP3",
+      postalCode: "33370",
+      city: "ARTIGUES PRES BORDEAUX",
+      siren: "",
+      tvaNumber: "",
+      codeService: ""
+    },
+    invoice: {
+      number: "FAC-2026-037",
+      issueDate: "2026-04-08",
+      deliveryDate: "2026-04-08",
+      dueDate: "2026-05-08",
+      purchaseOrder: "8000058218",
+      paymentTerms: "Virement bancaire à 30 jours",
+      notes: "",
+      deposit: 0,
+      items: [
+        { id: crypto.randomUUID(), description: "Repas complet", quantity: 4, unitPrice: 27.91, vatRate: 10 },
+        { id: crypto.randomUUID(), description: "Boisson (TVA 20%)", quantity: 1, unitPrice: 11.42, vatRate: 20 }
+      ]
+    },
+    status: "brouillon",
+    createdAt: "2026-04-08T14:47:00.000Z",
+    updatedAt: "2026-04-08T14:47:00.000Z"
+  }
+];
+
+const existing = JSON.parse(localStorage.getItem('invoices') || '[]');
+const existingNumbers = existing.map(i => i.invoice.number);
+const toAdd = newInvoices.filter(i => !existingNumbers.includes(i.invoice.number));
+const updated = [...toAdd, ...existing];
+localStorage.setItem('invoices', JSON.stringify(updated));
+
+// Mettre à jour le compteur
+localStorage.setItem('invoice-counter', JSON.stringify(38));
+
+document.getElementById('o').textContent = 'Factures ajoutées: ' + toAdd.map(i => i.invoice.number + ' ' + i.client.companyName).join(', ') + '\nTotal factures: ' + updated.length;
+</script></body></html>
