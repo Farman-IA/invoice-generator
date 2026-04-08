@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import type { ClientRecord, ClientInfo } from '@/types/invoice'
 
 interface ClientAutocompleteProps {
@@ -19,19 +19,10 @@ export function ClientAutocomplete({
   className,
 }: ClientAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [suggestions, setSuggestions] = useState<ClientRecord[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
-  const justSelectedRef = useRef(false)
 
-  useEffect(() => {
-    if (justSelectedRef.current) {
-      justSelectedRef.current = false
-      return
-    }
-    const results = findByName(value)
-    setSuggestions(results)
-    setIsOpen(results.length > 0)
-  }, [value, findByName])
+  // Derived state — calculé à chaque render, pas de useEffect + setState
+  const suggestions = useMemo(() => findByName(value), [value, findByName])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -44,7 +35,6 @@ export function ClientAutocomplete({
   }, [])
 
   const handleSelect = (client: ClientRecord) => {
-    justSelectedRef.current = true
     onSelectClient({
       companyName: client.companyName,
       contactName: client.contactName,
@@ -63,8 +53,8 @@ export function ClientAutocomplete({
       <input
         type="text"
         value={value}
-        onChange={e => onChange(e.target.value)}
-        onFocus={() => { if (suggestions.length > 0 && !justSelectedRef.current) setIsOpen(true) }}
+        onChange={e => { onChange(e.target.value); setIsOpen(true) }}
+        onFocus={() => { if (suggestions.length > 0) setIsOpen(true) }}
         placeholder={placeholder}
         className={className}
       />

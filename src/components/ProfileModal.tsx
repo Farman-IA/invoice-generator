@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -49,11 +49,12 @@ const SECTIONS = [
 ]
 
 export function ProfileModal({ open, onOpenChange, issuer, onUpdateIssuer }: ProfileModalProps) {
-  const [draft, setDraft] = useState<IssuerProfile>(issuer)
-
-  useEffect(() => {
-    if (open) setDraft(issuer)
-  }, [open, issuer])
+  // Reset le brouillon à chaque ouverture via key dans le parent serait idéal,
+  // mais ici on utilise un pattern contrôlé : draft initialisé depuis issuer
+  const [draft, setDraft] = useState(issuer)
+  const [lastOpen, setLastOpen] = useState(false)
+  if (open && !lastOpen) setDraft(issuer)
+  if (open !== lastOpen) setLastOpen(open)
 
   const handleSave = async () => {
     onUpdateIssuer(draft)

@@ -129,7 +129,7 @@ export function useInvoice() {
     return () => {
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     }
-  }, [state.client, state.invoice, isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.client, state.invoice, isLoading]) // currentInvoiceId est lu du ref uniquement, pas ajouté comme dépendance intentionnellement
 
   // Persister le profil émetteur à chaque modification (debounced)
   const issuerSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -181,22 +181,6 @@ export function useInvoice() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [])
 
-  // Synchroniser le profil émetteur avec storage quand il change ailleurs
-  useEffect(() => {
-    const interval = setInterval(() => {
-      storage.getIssuerProfile().then(issuer => {
-        if (issuer) {
-          setState(prev => {
-            if (JSON.stringify(prev.issuer) !== JSON.stringify(issuer)) {
-              return { ...prev, issuer }
-            }
-            return prev
-          })
-        }
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
 
   const updateIssuer = useCallback((partial: Partial<IssuerProfile>) => {
     setState(prev => ({ ...prev, issuer: { ...prev.issuer, ...partial } }))

@@ -58,7 +58,7 @@ function App() {
         addClient({ ...client })
       }
     }
-  }, [inv.isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inv.isLoading]) // addClient, updateClient, existsByName sont des callbacks stables; intention: charger une seule fois au démarrage
 
   // Charger le logo au montage
   useEffect(() => {
