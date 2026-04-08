@@ -2,13 +2,55 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ClientRecord } from '@/types/invoice'
 import { storage } from '@/lib/storage'
 
+const SEED_CLIENTS: Omit<ClientRecord, 'id'>[] = [
+  {
+    companyName: 'Université de Lorraine',
+    contactName: 'Agence Comptable/Bureau Facturier',
+    address: '91 Avenue de la Libération',
+    postalCode: '54021',
+    city: 'NANCY CEDEX',
+    siren: '',
+    tvaNumber: '',
+    codeService: '',
+  },
+  {
+    companyName: 'APAVE Exploitation France',
+    contactName: '',
+    address: 'ZI Avenue Gay Lussac BP3',
+    postalCode: '33370',
+    city: 'ARTIGUES PRES BORDEAUX',
+    siren: '',
+    tvaNumber: '',
+    codeService: '',
+  },
+  {
+    companyName: 'Garden Golf Metz Technopôle',
+    contactName: '',
+    address: '3 rue Félix Savart',
+    postalCode: '57070',
+    city: 'METZ',
+    siren: '',
+    tvaNumber: '',
+    codeService: '',
+  },
+]
+
 export function useClients() {
   const [clients, setClients] = useState<ClientRecord[]>([])
   const clientsRef = useRef(clients)
   useEffect(() => { clientsRef.current = clients }, [clients])
 
   useEffect(() => {
-    storage.getClients().then(setClients)
+    storage.getClients().then(async (saved) => {
+      if (saved.length === 0) {
+        // Pré-remplir le carnet avec les clients initiaux
+        const seeded = SEED_CLIENTS.map(c => ({ ...c, id: crypto.randomUUID() }))
+        await storage.saveClients(seeded)
+        setClients(seeded)
+      } else {
+        setClients(saved)
+      }
+    })
   }, [])
 
   const addClient = useCallback(async (client: Omit<ClientRecord, 'id'>) => {

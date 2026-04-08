@@ -46,6 +46,20 @@ function App() {
   // Vue globale (unifie factures et devis)
   const [view, setGlobalView] = useState<AppView>('DASHBOARD')
 
+  // Remplir le carnet de clients à partir des factures/devis existants (une seule fois)
+  useEffect(() => {
+    if (inv.isLoading) return
+    const allClients = [
+      ...inv.savedInvoices.map(i => i.client),
+      ...qt.savedQuotes.map(q => q.client),
+    ]
+    for (const client of allClients) {
+      if (client.companyName.trim() && !existsByName(client.companyName)) {
+        addClient({ ...client })
+      }
+    }
+  }, [inv.isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Charger le logo au montage
   useEffect(() => {
     storage.getLogo().then(setLogo)
@@ -94,10 +108,8 @@ function App() {
     await inv.saveInvoice()
     const clientName = inv.state.client.companyName.trim()
     if (clientName && !existsByName(clientName)) {
-      toast('Nouveau client détecté', {
-        action: { label: 'Ajouter au carnet', onClick: () => { addClient({ ...inv.state.client }); toast.success('Client ajouté') } },
-        duration: 5000,
-      })
+      await addClient({ ...inv.state.client })
+      toast.success('Client ajouté au carnet')
     }
   }
 
@@ -106,10 +118,8 @@ function App() {
     await qt.saveQuote()
     const clientName = qt.state.client.companyName.trim()
     if (clientName && !existsByName(clientName)) {
-      toast('Nouveau client détecté', {
-        action: { label: 'Ajouter au carnet', onClick: () => { addClient({ ...qt.state.client }); toast.success('Client ajouté') } },
-        duration: 5000,
-      })
+      await addClient({ ...qt.state.client })
+      toast.success('Client ajouté au carnet')
     }
   }
 
