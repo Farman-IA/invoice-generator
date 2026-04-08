@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import type { SavedInvoice, SavedQuote, IssuerProfile, ClientRecord, ArticleTemplate, AISettings } from '@/types/invoice'
 
 const KEYS = {
@@ -17,7 +18,9 @@ async function get<T>(key: string, fallback: T): Promise<T> {
   try {
     const result = await window.storage.get(key)
     return result ? JSON.parse(result.value) as T : fallback
-  } catch {
+  } catch (err) {
+    console.error('Données corrompues pour la clé:', key, err)
+    toast.error('Erreur de lecture des données sauvegardées')
     return fallback
   }
 }

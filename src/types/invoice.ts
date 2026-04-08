@@ -1,8 +1,9 @@
-export type VatRate = 5.5 | 10 | 20
+export type VatRate = 0 | 2.1 | 5.5 | 10 | 20
 
 export interface LineItem {
   id: string
   description: string
+  unit: string
   quantity: number
   unitPrice: number
   unitPriceTTC?: number
@@ -16,6 +17,8 @@ export interface IssuerProfile {
   postalCode: string
   city: string
   phone: string
+  email: string
+  website: string
   siret: string
   siren: string
   apeNaf: string
@@ -114,6 +117,7 @@ export interface ClientRecord {
 export interface ArticleTemplate {
   id: string
   description: string
+  unit: string
   unitPrice: number
   vatRate: VatRate
 }

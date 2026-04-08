@@ -55,7 +55,7 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
       const current = vatMap.get(item.vatRate) ?? { baseHT: 0, totalTTC: 0 }
       vatMap.set(item.vatRate, {
         baseHT: current.baseHT + lineTotal,
-        totalTTC: 0, // sera calculé après
+        totalTTC: current.totalTTC, // préserver le cumul TTC existant (mode mixte)
       })
     }
   }

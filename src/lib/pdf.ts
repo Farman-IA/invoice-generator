@@ -14,14 +14,16 @@ export async function generatePDF(
   clientName: string,
   type: 'invoice' | 'quote' = 'invoice'
 ): Promise<void> {
-  const date = new Date().toISOString().split('T')[0]
-  const prefix = type === 'invoice' ? 'Facture' : 'Devis'
+  const date = new Date().toISOString().split('T')[0].replace(/-/g, '')
   const cleanClient = sanitizeFilename(clientName) || 'Client'
-  const cleanNumber = sanitizeFilename(invoiceNumber) || prefix
+  const cleanNumber = sanitizeFilename(invoiceNumber) || (type === 'invoice' ? 'Facture' : 'Devis')
 
-  // Le nom du fichier dans "Enregistrer sous" vient du <title> de la page
+  // Chorus Pro exige un nom de fichier de moins de 50 caractères (.pdf inclus)
+  const maxBase = 50 - '.pdf'.length // 46 caractères max pour le nom
+  const baseName = `${cleanNumber}_${cleanClient}_${date}`.slice(0, maxBase).replace(/_+$/, '')
+
   const originalTitle = document.title
-  document.title = `${prefix}_${cleanNumber}_${cleanClient}_${date}`
+  document.title = baseName
 
   window.print()
 

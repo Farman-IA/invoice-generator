@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { toast } from 'sonner'
 import type { ClientRecord } from '@/types/invoice'
 import { storage } from '@/lib/storage'
 
@@ -67,7 +68,7 @@ export function useClients() {
     setClients(updated)
     clientsRef.current = updated
     const ok = await storage.saveClients(updated)
-    if (!ok) console.error('Erreur de sauvegarde client')
+    if (!ok) toast.error('Erreur de sauvegarde client')
   }, [])
 
   const deleteClient = useCallback(async (id: string) => {
@@ -75,7 +76,7 @@ export function useClients() {
     setClients(updated)
     clientsRef.current = updated
     const ok = await storage.saveClients(updated)
-    if (!ok) console.error('Erreur de suppression client')
+    if (!ok) toast.error('Erreur de suppression client')
   }, [])
 
   const findByName = useCallback((query: string): ClientRecord[] => {

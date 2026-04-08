@@ -28,6 +28,8 @@ const FIELDS: { key: keyof IssuerProfile; label: string; section: string }[] = [
   { key: 'postalCode', label: 'Code postal', section: 'address' },
   { key: 'city', label: 'Ville', section: 'address' },
   { key: 'phone', label: 'Téléphone', section: 'address' },
+  { key: 'email', label: 'Email', section: 'address' },
+  { key: 'website', label: 'Site web', section: 'address' },
   { key: 'siret', label: 'SIRET', section: 'legal' },
   { key: 'siren', label: 'SIREN', section: 'legal' },
   { key: 'apeNaf', label: 'Code APE/NAF', section: 'legal' },

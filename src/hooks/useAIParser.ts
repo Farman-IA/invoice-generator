@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from '@google/genai'
 import { storage } from '@/lib/storage'
 import type { AISettings, ParsedInvoiceData, VatRate, PriceMode } from '@/types/invoice'
 
-const VALID_VAT_RATES: VatRate[] = [5.5, 10, 20]
+const VALID_VAT_RATES: VatRate[] = [0, 2.1, 5.5, 10, 20]
 
 function buildInvoiceSchema(priceMode: PriceMode) {
   const priceDesc = priceMode === 'ttc'
@@ -30,7 +30,7 @@ function buildInvoiceSchema(priceMode: PriceMode) {
             description: { type: Type.STRING, description: 'Description de la prestation ou du produit' },
             quantity: { type: Type.NUMBER, description: 'Quantité' },
             unitPrice: { type: Type.NUMBER, description: priceDesc },
-            vatRate: { type: Type.NUMBER, description: 'Taux de TVA : 5.5, 10 ou 20' },
+            vatRate: { type: Type.NUMBER, description: 'Taux de TVA : 0, 2.1, 5.5, 10 ou 20' },
           },
           required: ['description', 'quantity', 'unitPrice', 'vatRate'],
         },
@@ -63,10 +63,12 @@ Exemples de questions → répondre avec message :
 - "Bonjour" → "Bonjour ! Décrivez-moi votre facture. Par exemple : « Facture pour Société X, 3 repas à 30€ et 1 location de salle à 500€ »"
 - "Comment ça marche ?" → "Décrivez votre facture en langage naturel et je remplirai automatiquement le client, les lignes et la TVA. Exemple : « 5 sandwichs à emporter à 8€ pour l'Université de Lorraine »"
 
-## Règles TVA restauration France :
+## Règles TVA France :
+- 0 : exonéré de TVA (auto-entrepreneur en franchise de base, article 293 B du CGI)
+- 2.1 : presse, médicaments remboursés, spectacle vivant (premières représentations)
 - 5.5 : alimentaire à emporter (sandwichs, plats à emporter)
 - 10 : restauration sur place (repas, boissons non alcoolisées sur place)
-- 20 : alcool (toujours), location de salle, prestations de service
+- 20 : alcool (toujours), location de salle, prestations de service, conseil, développement
 - En cas de doute : 20
 
 ## Règles d'adressage (norme française La Poste) :
@@ -250,7 +252,8 @@ export function useAIParser() {
       let prompt = buildSystemPrompt(priceMode)
 
       if (history.length > 0) {
-        const contextLines = history.map(m =>
+        const recentHistory = history.slice(-10)
+        const contextLines = recentHistory.map(m =>
           m.role === 'user' ? `Utilisateur : ${m.content}` : `Assistant : ${m.content}`
         )
         prompt += `\n\n## Historique de la conversation :\n${contextLines.join('\n')}`
@@ -258,30 +261,42 @@ export function useAIParser() {
 
       prompt += `\n\nNouveau message :\n${text}`
 
-      const response = await ai.models.generateContent({
-        model: currentSettings.model,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: buildInvoiceSchema(priceMode),
-        },
-      })
+      // Timeout 30s pour éviter de bloquer l'utilisateur indéfiniment
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout : l\'IA n\'a pas répondu en 30 secondes')), 30000)
+      )
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: currentSettings.model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: buildInvoiceSchema(priceMode),
+          },
+        }),
+        timeoutPromise,
+      ])
 
-      const raw = JSON.parse(response.text ?? '{}')
+      let raw: Record<string, unknown>
+      try {
+        raw = JSON.parse(response.text ?? '{}')
+      } catch {
+        return { data: null, message: null, error: 'Réponse IA invalide. Réessayez.', isRetryable: true }
+      }
 
-      // Si l'IA a renvoyé un message conversationnel
+      // Priorité : extraire les données de facture AVANT le message conversationnel
+      const parsed = validateParsedData(raw, priceMode)
+      if (parsed) {
+        return { data: parsed, message: null, error: null, isRetryable: false }
+      }
+
+      // Sinon, vérifier le message conversationnel
       const aiMessage = raw.message ? String(raw.message).trim() : null
       if (aiMessage) {
         return { data: null, message: aiMessage, error: null, isRetryable: false }
       }
 
-      // Sinon, extraire les données de facture
-      const parsed = validateParsedData(raw, priceMode)
-      if (!parsed) {
-        return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null, isRetryable: false }
-      }
-
-      return { data: parsed, message: null, error: null, isRetryable: false }
+      return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null, isRetryable: false }
     } catch (err) {
       const errorMsg = formatError(err)
       const isRetryable = err instanceof Error && /429|rate|quota|network|fetch|failed/i.test(err.message)

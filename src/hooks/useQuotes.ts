@@ -34,6 +34,7 @@ export function useQuotes() {
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([])
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state }, [state])
@@ -60,6 +61,7 @@ export function useQuotes() {
         issuer: issuer ?? prev.issuer,
         quote: getDefaultQuote(counter),
       }))
+      setIsLoading(false)
     }
     load()
   }, [])
@@ -80,6 +82,8 @@ export function useQuotes() {
     }, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  const autoSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const updateIssuer = useCallback((partial: Partial<IssuerProfile>) => {
     setState(prev => ({ ...prev, issuer: { ...prev.issuer, ...partial } }))
@@ -132,8 +136,8 @@ export function useQuotes() {
     }))
   }, [])
 
-  // Sauvegarder le devis courant
-  const saveQuote = useCallback(async () => {
+  // Sauvegarde interne (sans toast, utilisée par l'auto-save)
+  const saveQuoteInternal = useCallback(async () => {
     const now = new Date().toISOString()
     const current = stateRef.current
     const quoteId = currentQuoteIdRef.current
@@ -164,8 +168,60 @@ export function useQuotes() {
     savedQuotesRef.current = updated
     await storage.saveQuotes(updated)
     await storage.saveQuoteCounter(current.counter)
-    toast.success('Devis sauvegardé')
   }, [])
+
+  // Auto-save debounced (2s) pour les devis en cours d'édition
+  useEffect(() => {
+    if (isLoading) return
+    if (!state.client.companyName.trim()) return
+    if (currentQuoteId && savedQuotes.find(q => q.id === currentQuoteId)?.status !== 'brouillon') return
+
+    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+    autoSaveTimeout.current = setTimeout(() => {
+      saveQuoteInternal()
+    }, 2000)
+    return () => {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce auto-save : currentQuoteId et savedQuotes lus via refs
+  }, [state.client, state.quote, isLoading, saveQuoteInternal])
+
+  // Sauvegarder le devis en cours avant de fermer l'onglet
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+      if (stateRef.current.client.companyName.trim()) {
+        const now = new Date().toISOString()
+        const current = stateRef.current
+        const quoteId = currentQuoteIdRef.current
+        let updated: SavedQuote[]
+        if (quoteId) {
+          updated = savedQuotesRef.current.map(q =>
+            q.id === quoteId
+              ? { ...q, issuer: current.issuer, client: current.client, quote: current.quote, updatedAt: now }
+              : q
+          )
+        } else {
+          const newQuote: SavedQuote = {
+            id: crypto.randomUUID(), issuer: current.issuer, client: current.client,
+            quote: current.quote, status: 'brouillon', createdAt: now, updatedAt: now,
+          }
+          updated = [newQuote, ...savedQuotesRef.current]
+        }
+        storage.saveQuotes(updated)
+        storage.saveQuoteCounter(current.counter)
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // Sauvegarder le devis courant (avec toast)
+  const saveQuote = useCallback(async () => {
+    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+    await saveQuoteInternal()
+    toast.success('Devis sauvegardé')
+  }, [saveQuoteInternal])
 
   // Charger un devis
   const loadQuote = useCallback((id: string) => {

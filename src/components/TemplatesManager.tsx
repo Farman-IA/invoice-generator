@@ -22,12 +22,12 @@ interface TemplatesManagerProps {
 
 export function TemplatesManager({ open, onOpenChange, templates, onAdd, onUpdate, onDelete }: TemplatesManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ description: '', unitPrice: 0, vatRate: 20 as VatRate })
+  const [draft, setDraft] = useState({ description: '', unit: 'unité', unitPrice: 0, vatRate: 20 as VatRate })
   const [showNew, setShowNew] = useState(false)
 
   const startEdit = (t: ArticleTemplate) => {
     setEditingId(t.id)
-    setDraft({ description: t.description, unitPrice: t.unitPrice, vatRate: t.vatRate })
+    setDraft({ description: t.description, unit: t.unit, unitPrice: t.unitPrice, vatRate: t.vatRate })
   }
 
   const confirmEdit = () => {
@@ -40,7 +40,7 @@ export function TemplatesManager({ open, onOpenChange, templates, onAdd, onUpdat
   const handleAddNew = () => {
     if (draft.description.trim()) {
       onAdd(draft)
-      setDraft({ description: '', unitPrice: 0, vatRate: 20 })
+      setDraft({ description: '', unit: 'unité', unitPrice: 0, vatRate: 20 })
       setShowNew(false)
     }
   }
@@ -84,7 +84,7 @@ export function TemplatesManager({ open, onOpenChange, templates, onAdd, onUpdat
                 draft={draft}
                 setDraft={setDraft}
                 onConfirm={handleAddNew}
-                onCancel={() => { setShowNew(false); setDraft({ description: '', unitPrice: 0, vatRate: 20 }) }}
+                onCancel={() => { setShowNew(false); setDraft({ description: '', unit: 'unité', unitPrice: 0, vatRate: 20 }) }}
               />
             </div>
           ) : (
@@ -111,7 +111,7 @@ function TemplateForm({
   onConfirm,
   onCancel,
 }: {
-  draft: { description: string; unitPrice: number; vatRate: VatRate }
+  draft: { description: string; unit: string; unitPrice: number; vatRate: VatRate }
   setDraft: (fn: (d: typeof draft) => typeof draft) => void
   onConfirm: () => void
   onCancel: () => void

@@ -19,6 +19,11 @@ import {
   generateInvoiceNumber,
 } from '@/lib/constants'
 
+// Date locale (évite le décalage UTC qui peut fausser les comparaisons de retard)
+function getLocalDate(): string {
+  return new Date().toLocaleDateString('sv-SE') // format YYYY-MM-DD
+}
+
 export function useInvoice() {
   const [state, setState] = useState<InvoiceState>({
     issuer: getDefaultIssuer(),
@@ -31,6 +36,9 @@ export function useInvoice() {
   const [view, setView] = useState<AppView>('EDIT')
   const [isFinalized, setIsFinalized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Guard pour empêcher les duplications concurrentes
+  const duplicatingRef = useRef(false)
 
   // Refs pour éviter les closures stale
   const stateRef = useRef(state)
@@ -53,7 +61,7 @@ export function useInvoice() {
         ])
 
         // Calcul auto du statut en_retard
-        const today = new Date().toISOString().split('T')[0]
+        const today = getLocalDate()
         const withLateStatus = invoices.map(inv => {
           if (inv.status === 'finalisée' && inv.paymentStatus === 'en_attente' && inv.invoice.dueDate < today) {
             return { ...inv, paymentStatus: 'en_retard' as const }
@@ -89,7 +97,7 @@ export function useInvoice() {
   // Recalculer le statut en_retard quand l'utilisateur revient sur l'onglet
   useEffect(() => {
     function checkLatePayments() {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getLocalDate()
       let hasChanges = false
       const updated = savedInvoicesRef.current.map(inv => {
         if (inv.status === 'finalisée' && inv.paymentStatus === 'en_attente' && inv.invoice.dueDate < today) {
@@ -129,7 +137,8 @@ export function useInvoice() {
     return () => {
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     }
-  }, [state.client, state.invoice, isLoading]) // currentInvoiceId est lu du ref uniquement, pas ajouté comme dépendance intentionnellement
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce auto-save : currentInvoiceId et upsertAndPersist lus via refs
+  }, [state.client, state.invoice, isLoading])
 
   // Persister le profil émetteur à chaque modification (debounced)
   const issuerSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -282,12 +291,14 @@ export function useInvoice() {
 
   // Sauvegarder la facture courante dans la collection
   const saveInvoice = useCallback(async () => {
+    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     await upsertAndPersist('brouillon')
     toast.success('Facture sauvegardée')
   }, [upsertAndPersist])
 
   // Finaliser la facture : statut → finalisée, sauvegarder
   const finalizeInvoice = useCallback(async (): Promise<boolean> => {
+    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     // Valider les champs obligatoires
     if (!stateRef.current.client.companyName?.trim()) {
       toast.error('Veuillez renseigner le client')
@@ -333,8 +344,11 @@ export function useInvoice() {
 
   // Dupliquer une facture
   const duplicateInvoice = useCallback(async (id: string) => {
+    if (duplicatingRef.current) return
+    duplicatingRef.current = true
+    try {
     const original = savedInvoicesRef.current.find(inv => inv.id === id)
-    if (!original) return
+    if (!original) { duplicatingRef.current = false; return }
 
     const now = new Date().toISOString()
     const newCounter = stateRef.current.counter + 1
@@ -385,6 +399,9 @@ export function useInvoice() {
     } else {
       toast.success('Facture dupliquée')
     }
+    } finally {
+      duplicatingRef.current = false
+    }
   }, [])
 
   // Supprimer une facture
@@ -403,6 +420,12 @@ export function useInvoice() {
       setCurrentInvoiceId(null)
       currentInvoiceIdRef.current = null
       setIsFinalized(false)
+      // Reset le formulaire pour éviter que l'auto-save recrée la facture
+      setState(prev => ({
+        ...prev,
+        client: getDefaultClient(),
+        invoice: getDefaultInvoice(prev.counter),
+      }))
     }
 
     toast.success('Facture supprimée')
@@ -425,7 +448,7 @@ export function useInvoice() {
 
   // Annuler le paiement (remettre en attente)
   const markAsUnpaid = useCallback(async (id: string) => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDate()
     const updated = savedInvoicesRef.current.map(inv => {
       if (inv.id !== id) return inv
       const isLate = inv.invoice.dueDate < today

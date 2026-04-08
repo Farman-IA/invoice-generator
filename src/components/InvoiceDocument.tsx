@@ -225,6 +225,8 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 />
               </div>
               <LabeledField label="Tél" value={issuer.phone} onChange={(v) => onUpdateIssuer({ phone: v })} placeholder={PLACEHOLDERS.issuer.phone} />
+              <LabeledField label="Email" value={issuer.email} onChange={(v) => onUpdateIssuer({ email: v })} placeholder={PLACEHOLDERS.issuer.email} />
+              <LabeledField label="Web" value={issuer.website} onChange={(v) => onUpdateIssuer({ website: v })} placeholder={PLACEHOLDERS.issuer.website} />
             </div>
             {/* Infos légales */}
             <div className="mt-2 space-y-0.5 text-xs text-gray-600">
@@ -480,6 +482,13 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 placeholder={PLACEHOLDERS.issuer.rcProScope}
                 className="text-xs"
               />
+            </div>
+          )}
+
+          {/* Mention TVA non applicable (auto-entrepreneurs / franchise de base) */}
+          {!issuer.tvaNumber && (
+            <div className="text-[10px] text-gray-500 font-medium pt-2 border-t border-gray-100">
+              <p>{LEGAL_MENTIONS.tvaExemption}</p>
             </div>
           )}
 

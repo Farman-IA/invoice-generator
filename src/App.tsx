@@ -58,7 +58,8 @@ function App() {
         addClient({ ...client })
       }
     }
-  }, [inv.isLoading]) // addClient, updateClient, existsByName sont des callbacks stables; intention: charger une seule fois au démarrage
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- exécution unique au chargement, les callbacks sont stables
+  }, [inv.isLoading])
 
   // Charger le logo au montage
   useEffect(() => {
@@ -164,11 +165,11 @@ function App() {
   }
 
   const handleSaveAsTemplate = (item: LineItem) => {
-    addTemplate({ description: item.description, unitPrice: item.unitPrice, vatRate: item.vatRate })
+    addTemplate({ description: item.description, unit: item.unit, unitPrice: item.unitPrice, vatRate: item.vatRate })
   }
 
   const handleInsertTemplate = (template: ArticleTemplate) => {
-    const data = { description: template.description, unitPrice: template.unitPrice, vatRate: template.vatRate as VatRate }
+    const data = { description: template.description, unit: template.unit, unitPrice: template.unitPrice, vatRate: template.vatRate as VatRate }
     if (view === 'QUOTE_EDIT') qt.addLineItem(data)
     else inv.addLineItem(data)
   }
@@ -222,6 +223,7 @@ function App() {
         const newItems = data.items.map(item => ({
           id: crypto.randomUUID(),
           description: item.description,
+          unit: 'unité',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           ...(item.unitPriceTTC != null ? { unitPriceTTC: item.unitPriceTTC } : {}),

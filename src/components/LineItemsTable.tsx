@@ -48,6 +48,7 @@ export function LineItemsTable({
         <colgroup>
           <col />
           <col style={{ width: 60 }} />
+          <col style={{ width: 70 }} />
           <col style={{ width: 120 }} />
           <col style={{ width: 80 }} />
           <col style={{ width: 120 }} />
@@ -57,6 +58,7 @@ export function LineItemsTable({
           <tr className="border-b-2 border-gray-800 dark:border-gray-300 text-left">
             <th className="pb-2 font-semibold">Description</th>
             <th className="pb-2 font-semibold text-center">Qté</th>
+            <th className="pb-2 font-semibold text-center px-2">Unité</th>
             <th className="pb-2 font-semibold text-right px-2">Prix unitaire HT</th>
             <th className="pb-2 font-semibold text-center px-2">TVA</th>
             <th className="pb-2 font-semibold text-right px-2">Total HT</th>
@@ -90,6 +92,13 @@ export function LineItemsTable({
                     onChange={(v) => onUpdate(item.id, { quantity: Math.max(1, Number(v) || 1) })}
                     as="number"
                     className="text-center w-full"
+                  />
+                </td>
+                <td className="py-2.5 px-2 text-center">
+                  <InlineEdit
+                    value={item.unit ?? 'unité'}
+                    onChange={(v) => onUpdate(item.id, { unit: v })}
+                    className="text-center w-full text-xs"
                   />
                 </td>
                 <td className="py-2.5 px-2 text-right">

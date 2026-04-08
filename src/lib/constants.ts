@@ -2,6 +2,16 @@ import type { VatRate, IssuerProfile, ClientInfo, InvoiceData, QuoteData, LineIt
 
 export const VAT_RATES: { value: VatRate; label: string; description: string }[] = [
   {
+    value: 0,
+    label: '0 %',
+    description: 'Exonéré / Auto-entrepreneur',
+  },
+  {
+    value: 2.1,
+    label: '2,1 %',
+    description: 'Presse / Médicaments',
+  },
+  {
     value: 5.5,
     label: '5,5 %',
     description: 'Alimentaire',
@@ -35,6 +45,8 @@ export function getDefaultIssuer(): IssuerProfile {
     postalCode: '',
     city: '',
     phone: '',
+    email: '',
+    website: '',
     siret: '',
     siren: '',
     apeNaf: '',
@@ -66,6 +78,7 @@ export function createDefaultLineItem(): LineItem {
   return {
     id: crypto.randomUUID(),
     description: '',
+    unit: 'unité',
     quantity: 1,
     unitPrice: 0,
     vatRate: 10,
@@ -124,7 +137,7 @@ export function getDefaultQuote(counter: number): QuoteData {
 
 export const LEGAL_MENTIONS = {
   latePaymentPenalty:
-    'Taux de pénalité de retard : 12,15 % par an (taux directeur BCE majoré de 10 points)',
+    'En cas de retard de paiement, des pénalités égales à 3 fois le taux d\'intérêt légal seront appliquées',
   recoveryIndemnity:
     'En cas de retard de paiement, une indemnité forfaitaire de 40 € pour frais de recouvrement sera exigée (Art. L.441-10 et D.441-5 du Code de commerce)',
   noEarlyDiscount: "Pas d'escompte pour paiement anticipé",
@@ -139,6 +152,8 @@ export const PLACEHOLDERS = {
     postalCode: 'Code postal',
     city: 'Ville',
     phone: 'Téléphone',
+    email: 'Email',
+    website: 'Site web (URL)',
     siret: 'N° SIRET',
     siren: 'N° SIREN',
     apeNaf: 'Code APE/NAF',
