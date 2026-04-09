@@ -58,6 +58,7 @@ export function getDefaultIssuer(): IssuerProfile {
     bankName: '',
     iban: '',
     bic: '',
+    priceMode: 'ht',
   }
 }
 

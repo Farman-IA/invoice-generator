@@ -84,7 +84,7 @@ export function ProfileModal({ open, onOpenChange, issuer, onUpdateIssuer }: Pro
                     <label className="text-xs text-gray-500 dark:text-gray-400">{field.label}</label>
                     <input
                       type="text"
-                      value={draft[field.key]}
+                      value={typeof draft[field.key] === 'string' ? draft[field.key] as string : ''}
                       onChange={e => setDraft(prev => ({ ...prev, [field.key]: e.target.value }))}
                       className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
                     />
@@ -93,6 +93,47 @@ export function ProfileModal({ open, onOpenChange, issuer, onUpdateIssuer }: Pro
               </div>
             </div>
           ))}
+
+          {/* Mode de saisie des prix */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+              Mode de saisie des prix
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDraft(prev => ({ ...prev, priceMode: 'ht' }))}
+                className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                  (draft.priceMode ?? 'ht') === 'ht'
+                    ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
+                }`}
+              >
+                <div className="font-medium">HT</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Prix hors taxe</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraft(prev => ({ ...prev, priceMode: 'ttc' }))}
+                className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                  draft.priceMode === 'ttc'
+                    ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
+                }`}
+              >
+                <div className="font-medium">TTC</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Toutes taxes comprises</div>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+              Recommandé TTC pour les restaurants et commerces (évite les écarts d'arrondi).
+            </p>
+            {draft.priceMode !== (issuer.priceMode ?? 'ht') && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">
+                ⚠ Ce changement s'appliquera aux nouvelles lignes. Les lignes existantes peuvent nécessiter une re-saisie pour un arrondi exact.
+              </p>
+            )}
+          </div>
 
           <AISettingsSection />
         </div>

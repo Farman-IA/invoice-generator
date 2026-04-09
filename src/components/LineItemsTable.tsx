@@ -12,7 +12,7 @@ import {
 import { InlineEdit } from '@/components/InlineEdit'
 import { calculateLineTotal, formatEuro } from '@/lib/calculations'
 import { VAT_RATES, PLACEHOLDERS } from '@/lib/constants'
-import type { LineItem, VatRate, ArticleTemplate } from '@/types/invoice'
+import type { LineItem, VatRate, ArticleTemplate, PriceMode } from '@/types/invoice'
 
 interface LineItemsTableProps {
   items: LineItem[]
@@ -22,12 +22,15 @@ interface LineItemsTableProps {
   templates?: ArticleTemplate[]
   onSaveAsTemplate?: (item: LineItem) => void
   onInsertTemplate?: (template: ArticleTemplate) => void
+  priceMode?: PriceMode
 }
 
 export function LineItemsTable({
   items, onAdd, onRemove, onUpdate,
   templates = [], onSaveAsTemplate, onInsertTemplate,
+  priceMode = 'ht',
 }: LineItemsTableProps) {
+  const isTTCMode = priceMode === 'ttc'
   const [showTemplateMenu, setShowTemplateMenu] = useState(false)
   const templateMenuRef = useRef<HTMLDivElement>(null)
 
@@ -59,9 +62,9 @@ export function LineItemsTable({
             <th className="pb-2 font-semibold">Description</th>
             <th className="pb-2 font-semibold text-center">Qté</th>
             <th className="pb-2 font-semibold text-center px-2">Unité</th>
-            <th className="pb-2 font-semibold text-right px-2">Prix unitaire HT</th>
+            <th className="pb-2 font-semibold text-right px-2">{isTTCMode ? 'Prix unitaire TTC' : 'Prix unitaire HT'}</th>
             <th className="pb-2 font-semibold text-center px-2">TVA</th>
-            <th className="pb-2 font-semibold text-right px-2">Total HT</th>
+            <th className="pb-2 font-semibold text-right px-2">{isTTCMode ? 'Total TTC' : 'Total HT'}</th>
             <th></th>
           </tr>
         </thead>
@@ -69,9 +72,16 @@ export function LineItemsTable({
           {items.map((item) => {
             const isTTC = item.unitPriceTTC != null && item.unitPriceTTC > 0
             const lineTTC = isTTC ? Math.round(item.quantity * item.unitPriceTTC! * 100) / 100 : 0
-            const lineTotal = isTTC
-              ? Math.round(lineTTC / (1 + item.vatRate / 100) * 100) / 100
-              : calculateLineTotal(item.quantity, item.unitPrice)
+            // lineTotal pour affichage : TTC si mode TTC, HT sinon
+            const lineTotal = isTTCMode
+              ? (isTTC ? lineTTC : Math.round(item.quantity * item.unitPrice * (1 + item.vatRate / 100) * 100) / 100)
+              : (isTTC
+                  ? Math.round(lineTTC / (1 + item.vatRate / 100) * 100) / 100
+                  : calculateLineTotal(item.quantity, item.unitPrice))
+            // Prix unitaire affiche dans l'input
+            const displayUnitPrice = isTTCMode
+              ? (item.unitPriceTTC ?? item.unitPrice * (1 + item.vatRate / 100))
+              : item.unitPrice
             return (
               <tr
                 key={item.id}
@@ -103,11 +113,17 @@ export function LineItemsTable({
                 </td>
                 <td className="py-2.5 px-2 text-right">
                   <InlineEdit
-                    value={String(Math.round(item.unitPrice * 100) / 100)}
+                    value={String(Math.round(displayUnitPrice * 100) / 100)}
                     onChange={(v) => {
-                      const newHT = Math.max(0, Number(v) || 0)
-                      // Si l'utilisateur modifie le prix HT manuellement, on supprime le lien TTC
-                      onUpdate(item.id, { unitPrice: newHT, unitPriceTTC: undefined })
+                      const newPrice = Math.max(0, Number(v) || 0)
+                      if (isTTCMode) {
+                        // Mode TTC : on stocke le TTC, le HT est derive sans arrondi
+                        const newHT = newPrice / (1 + item.vatRate / 100)
+                        onUpdate(item.id, { unitPrice: newHT, unitPriceTTC: newPrice })
+                      } else {
+                        // Mode HT : comportement classique, supprime le lien TTC
+                        onUpdate(item.id, { unitPrice: newPrice, unitPriceTTC: undefined })
+                      }
                     }}
                     as="number"
                     className="text-right w-full"
@@ -117,7 +133,16 @@ export function LineItemsTable({
                   <div className="pdf-vat-select">
                     <Select
                       value={String(item.vatRate)}
-                      onValueChange={(v) => onUpdate(item.id, { vatRate: Number(v) as VatRate })}
+                      onValueChange={(v) => {
+                        const newRate = Number(v) as VatRate
+                        if (isTTCMode && item.unitPriceTTC != null && item.unitPriceTTC > 0) {
+                          // Mode TTC : recalcule HT a partir du TTC avec le nouveau taux
+                          const newHT = item.unitPriceTTC / (1 + newRate / 100)
+                          onUpdate(item.id, { vatRate: newRate, unitPrice: newHT })
+                        } else {
+                          onUpdate(item.id, { vatRate: newRate })
+                        }
+                      }}
                     >
                       <SelectTrigger className="h-auto border-none bg-transparent shadow-none text-sm px-0 py-0 w-full hover:bg-blue-50/60 dark:hover:bg-blue-900/30 relative [&>svg]:absolute [&>svg]:right-0 [&>svg]:top-1/2 [&>svg]:-translate-y-1/2" style={{ justifyContent: 'center' }}>
                         <SelectValue style={{ flex: 'none', textAlign: 'center' }} />

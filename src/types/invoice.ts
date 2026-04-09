@@ -30,6 +30,7 @@ export interface IssuerProfile {
   bankName: string
   iban: string
   bic: string
+  priceMode?: PriceMode
 }
 
 export interface ClientInfo {

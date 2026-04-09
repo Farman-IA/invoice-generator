@@ -49,13 +49,16 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
     } else {
       // Mode HT classique
       const lineTotal = calculateLineTotal(item.quantity, item.unitPrice)
+      // Calculer aussi le TTC equivalent pour mode mixte
+      const lineTTCFromHT = Math.round(lineTotal * (1 + item.vatRate / 100) * 100) / 100
 
       totalHT += lineTotal
+      totalTTC += lineTTCFromHT
 
       const current = vatMap.get(item.vatRate) ?? { baseHT: 0, totalTTC: 0 }
       vatMap.set(item.vatRate, {
         baseHT: current.baseHT + lineTotal,
-        totalTTC: current.totalTTC, // préserver le cumul TTC existant (mode mixte)
+        totalTTC: current.totalTTC + lineTTCFromHT,
       })
     }
   }

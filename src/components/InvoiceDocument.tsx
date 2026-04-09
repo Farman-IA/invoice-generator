@@ -7,7 +7,7 @@ import { ClientAutocomplete } from '@/components/ClientAutocomplete'
 import { LineItemsTable } from '@/components/LineItemsTable'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
 import { PLACEHOLDERS, LEGAL_MENTIONS } from '@/lib/constants'
-import type { IssuerProfile, ClientInfo, InvoiceData, QuoteData, LineItem, ArticleTemplate, ClientRecord } from '@/types/invoice'
+import type { IssuerProfile, ClientInfo, InvoiceData, QuoteData, LineItem, ArticleTemplate, ClientRecord, PriceMode } from '@/types/invoice'
 import { VALIDITY_OPTIONS } from '@/lib/constants'
 
 interface BaseDocumentProps {
@@ -25,6 +25,7 @@ interface BaseDocumentProps {
   templates?: ArticleTemplate[]
   onSaveAsTemplate?: (item: LineItem) => void
   onInsertTemplate?: (template: ArticleTemplate) => void
+  priceMode?: PriceMode
 }
 
 interface InvoiceMode extends BaseDocumentProps {
@@ -89,6 +90,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
       templates,
       onSaveAsTemplate,
       onInsertTemplate,
+      priceMode = 'ht',
       ...rest
     },
     ref
@@ -363,6 +365,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           templates={templates}
           onSaveAsTemplate={onSaveAsTemplate}
           onInsertTemplate={onInsertTemplate}
+          priceMode={priceMode}
         />
 
         {/* ========== TOTALS ========== */}

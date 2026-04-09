@@ -165,11 +165,23 @@ function App() {
   }
 
   const handleSaveAsTemplate = (item: LineItem) => {
+    // Le template stocke toujours le HT comme forme canonique (item.unitPrice est le HT, derive si TTC)
     addTemplate({ description: item.description, unit: item.unit, unitPrice: item.unitPrice, vatRate: item.vatRate })
   }
 
   const handleInsertTemplate = (template: ArticleTemplate) => {
-    const data = { description: template.description, unit: template.unit, unitPrice: template.unitPrice, vatRate: template.vatRate as VatRate }
+    const priceMode = inv.state.issuer.priceMode ?? 'ht'
+    const vatRate = template.vatRate as VatRate
+    // En mode TTC, calculer le unitPriceTTC a partir du HT stocke
+    const data = priceMode === 'ttc'
+      ? {
+          description: template.description,
+          unit: template.unit,
+          unitPrice: template.unitPrice,
+          unitPriceTTC: Math.round(template.unitPrice * (1 + vatRate / 100) * 100) / 100,
+          vatRate,
+        }
+      : { description: template.description, unit: template.unit, unitPrice: template.unitPrice, vatRate }
     if (view === 'QUOTE_EDIT') qt.addLineItem(data)
     else inv.addLineItem(data)
   }
@@ -220,15 +232,27 @@ function App() {
 
       // Articles
       if (hasItems) {
-        const newItems = data.items.map(item => ({
-          id: crypto.randomUUID(),
-          description: item.description,
-          unit: 'unité',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          ...(item.unitPriceTTC != null ? { unitPriceTTC: item.unitPriceTTC } : {}),
-          vatRate: item.vatRate,
-        }))
+        const profilePriceMode = inv.state.issuer.priceMode ?? 'ht'
+        const newItems = data.items.map(item => {
+          // Normaliser selon le mode du profil
+          const base = {
+            id: crypto.randomUUID(),
+            description: item.description,
+            unit: 'unité',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            vatRate: item.vatRate,
+          }
+          if (profilePriceMode === 'ttc') {
+            // Si l'IA a deja fourni un TTC, l'utiliser. Sinon, le deriver du HT.
+            const unitPriceTTC = item.unitPriceTTC != null
+              ? item.unitPriceTTC
+              : Math.round(item.unitPrice * (1 + item.vatRate / 100) * 100) / 100
+            return { ...base, unitPriceTTC }
+          }
+          // Mode HT : pas de unitPriceTTC
+          return base
+        })
 
         if (isNewInvoice || !hasClient) {
           // Nouvelle facture OU modification d'articles seuls → remplacer si nouvelle, ajouter si modification
@@ -489,6 +513,7 @@ function App() {
               templates={inv.isFinalized ? undefined : templates}
               onSaveAsTemplate={inv.isFinalized ? undefined : handleSaveAsTemplate}
               onInsertTemplate={inv.isFinalized ? undefined : handleInsertTemplate}
+              priceMode={inv.state.issuer.priceMode ?? 'ht'}
             />
           </div>
         </div>
@@ -515,6 +540,7 @@ function App() {
             templates={qt.isLocked ? undefined : templates}
             onSaveAsTemplate={qt.isLocked ? undefined : handleSaveAsTemplate}
             onInsertTemplate={qt.isLocked ? undefined : handleInsertTemplate}
+            priceMode={qt.state.issuer.priceMode ?? 'ht'}
           />
         </div>
       )}
