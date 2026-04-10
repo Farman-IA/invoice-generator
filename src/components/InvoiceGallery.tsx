@@ -218,16 +218,20 @@ export function InvoiceGallery({
                   <p className="text-[10px] text-gray-400">{date}</p>
                 </div>
 
-                {/* Actions */}
+                {/* Actions - ligne 1 : Charger / Dupliquer */}
                 <div className="flex items-center gap-0.5 mt-1.5">
-                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onEdit(invoice.id)}>
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6 min-w-0" onClick={() => onEdit(invoice.id)}>
                     <FolderOpen className="size-3 mr-0.5" />
                     Charger
                   </Button>
-                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onDuplicate(invoice.id)}>
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6 min-w-0" onClick={() => onDuplicate(invoice.id)}>
                     <Copy className="size-3 mr-0.5" />
                     Dupliquer
                   </Button>
+                </div>
+
+                {/* Actions - ligne 2 : icônes download / payé / supprimer */}
+                <div className="flex items-center justify-end gap-0.5 mt-1">
                   {!isBrouillon && (
                     <Button variant="ghost" size="icon-xs" onClick={() => onDownload(invoice.id)} title="PDF" aria-label="Télécharger PDF">
                       <Download className="size-3" />

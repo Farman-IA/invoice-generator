@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Copy, Trash2, Download, FileText, ArrowRight, Search, X, Send, Check, XCircle, FolderOpen } from 'lucide-react'
+import { Copy, Trash2, Download, FileText, ArrowRight, Search, X, Send, Check, XCircle, FolderOpen, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -148,16 +148,20 @@ export function QuoteGallery({
                   <p className="text-[10px] text-gray-400">{date}</p>
                 </div>
 
-                {/* Actions */}
+                {/* Actions - ligne 1 : Charger / Dupliquer */}
                 <div className="flex items-center gap-0.5 mt-1.5">
-                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onEdit(quote.id)}>
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6 min-w-0" onClick={() => onEdit(quote.id)}>
                     <FolderOpen className="size-3 mr-0.5" />
                     Charger
                   </Button>
-                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6" onClick={() => onDuplicate(quote.id)}>
+                  <Button variant="outline" size="xs" className="flex-1 text-[10px] h-6 min-w-0" onClick={() => onDuplicate(quote.id)}>
                     <Copy className="size-3 mr-0.5" />
                     Dupliquer
                   </Button>
+                </div>
+
+                {/* Actions - ligne 2 : icônes */}
+                <div className="flex items-center justify-end gap-0.5 mt-1">
                   <Button variant="ghost" size="icon-xs" onClick={() => onDownload(quote.id)} title="PDF" aria-label="Télécharger PDF">
                     <Download className="size-3" />
                   </Button>
@@ -177,6 +181,20 @@ export function QuoteGallery({
                         <XCircle className="size-3" />
                       </Button>
                     </>
+                  )}
+
+                  {/* Retour en brouillon (annuler erreur de clic) */}
+                  {!isBrouillon && !quote.linkedInvoiceId && (
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => onUpdateStatus(quote.id, 'brouillon')}
+                      title="Revenir en brouillon"
+                      aria-label="Revenir en brouillon"
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <RotateCcw className="size-3" />
+                    </Button>
                   )}
 
                   {/* Convertir */}
