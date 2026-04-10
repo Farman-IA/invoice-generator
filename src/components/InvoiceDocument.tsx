@@ -350,7 +350,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               </div>
             </>
           )}
-          <div className="flex gap-1 whitespace-nowrap">
+          <div className="flex gap-1 whitespace-nowrap" data-empty={!invoice.purchaseOrder ? '' : undefined}>
             <span className="text-gray-400">N° commande :</span>
             <InlineEdit
               value={invoice.purchaseOrder}
