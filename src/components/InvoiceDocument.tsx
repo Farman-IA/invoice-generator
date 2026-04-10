@@ -26,6 +26,7 @@ interface BaseDocumentProps {
   onSaveAsTemplate?: (item: LineItem) => void
   onInsertTemplate?: (template: ArticleTemplate) => void
   priceMode?: PriceMode
+  onPriceModeChange?: (mode: PriceMode) => void
 }
 
 interface InvoiceMode extends BaseDocumentProps {
@@ -91,6 +92,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
       onSaveAsTemplate,
       onInsertTemplate,
       priceMode = 'ht',
+      onPriceModeChange,
       ...rest
     },
     ref
@@ -366,6 +368,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           onSaveAsTemplate={onSaveAsTemplate}
           onInsertTemplate={onInsertTemplate}
           priceMode={priceMode}
+          onPriceModeChange={onPriceModeChange}
         />
 
         {/* ========== TOTALS ========== */}

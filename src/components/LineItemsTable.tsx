@@ -23,12 +23,14 @@ interface LineItemsTableProps {
   onSaveAsTemplate?: (item: LineItem) => void
   onInsertTemplate?: (template: ArticleTemplate) => void
   priceMode?: PriceMode
+  onPriceModeChange?: (mode: PriceMode) => void
 }
 
 export function LineItemsTable({
   items, onAdd, onRemove, onUpdate,
   templates = [], onSaveAsTemplate, onInsertTemplate,
   priceMode = 'ht',
+  onPriceModeChange,
 }: LineItemsTableProps) {
   const isTTCMode = priceMode === 'ttc'
   const [showTemplateMenu, setShowTemplateMenu] = useState(false)
@@ -47,6 +49,39 @@ export function LineItemsTable({
 
   return (
     <div className="mt-8">
+      {/* Toggle HT/TTC - affiché uniquement en édition (print:hidden) */}
+      {onPriceModeChange && (
+        <div className="mb-3 flex items-center justify-end gap-2 print:hidden">
+          <span className="text-xs text-gray-500 dark:text-gray-400">Saisie des prix :</span>
+          <div className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => onPriceModeChange('ht')}
+              className={`px-3 py-1 text-xs font-medium transition-colors ${
+                !isTTCMode
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+              }`}
+              aria-pressed={!isTTCMode}
+            >
+              HT
+            </button>
+            <button
+              type="button"
+              onClick={() => onPriceModeChange('ttc')}
+              className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-200 dark:border-gray-700 ${
+                isTTCMode
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+              }`}
+              aria-pressed={isTTCMode}
+            >
+              TTC
+            </button>
+          </div>
+        </div>
+      )}
+
       <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
         <colgroup>
           <col />

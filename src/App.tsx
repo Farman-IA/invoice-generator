@@ -514,6 +514,10 @@ function App() {
               onSaveAsTemplate={inv.isFinalized ? undefined : handleSaveAsTemplate}
               onInsertTemplate={inv.isFinalized ? undefined : handleInsertTemplate}
               priceMode={inv.state.issuer.priceMode ?? 'ht'}
+              onPriceModeChange={inv.isFinalized ? undefined : (mode) => {
+                inv.updateIssuer({ priceMode: mode })
+                qt.updateIssuer({ priceMode: mode })
+              }}
             />
           </div>
         </div>
@@ -541,6 +545,10 @@ function App() {
             onSaveAsTemplate={qt.isLocked ? undefined : handleSaveAsTemplate}
             onInsertTemplate={qt.isLocked ? undefined : handleInsertTemplate}
             priceMode={qt.state.issuer.priceMode ?? 'ht'}
+            onPriceModeChange={qt.isLocked ? undefined : (mode) => {
+              qt.updateIssuer({ priceMode: mode })
+              inv.updateIssuer({ priceMode: mode })
+            }}
           />
         </div>
       )}
