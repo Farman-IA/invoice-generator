@@ -3,36 +3,50 @@ import { toast } from 'sonner'
 import type { ClientRecord } from '@/types/invoice'
 import { storage } from '@/lib/storage'
 
+const EMPTY_CLIENT_FIELDS = {
+  contactName: '',
+  legalForm: '',
+  address: '',
+  postalCode: '',
+  city: '',
+  phone: '',
+  email: '',
+  website: '',
+  siret: '',
+  siren: '',
+  apeNaf: '',
+  tvaNumber: '',
+  codeService: '',
+}
+
+// Normalise un client chargé depuis le storage pour garantir que
+// tous les nouveaux champs existent même sur les anciennes données.
+function normalizeClient(client: Partial<ClientRecord> & { id: string; companyName: string }): ClientRecord {
+  return { ...EMPTY_CLIENT_FIELDS, ...client } as ClientRecord
+}
+
 const SEED_CLIENTS: Omit<ClientRecord, 'id'>[] = [
   {
+    ...EMPTY_CLIENT_FIELDS,
     companyName: 'Université de Lorraine',
     contactName: 'Agence Comptable/Bureau Facturier',
     address: '91 Avenue de la Libération',
     postalCode: '54021',
     city: 'NANCY CEDEX',
-    siren: '',
-    tvaNumber: '',
-    codeService: '',
   },
   {
+    ...EMPTY_CLIENT_FIELDS,
     companyName: 'APAVE Exploitation France',
-    contactName: '',
     address: 'ZI Avenue Gay Lussac BP3',
     postalCode: '33370',
     city: 'ARTIGUES PRES BORDEAUX',
-    siren: '',
-    tvaNumber: '',
-    codeService: '',
   },
   {
+    ...EMPTY_CLIENT_FIELDS,
     companyName: 'Garden Golf Metz Technopôle',
-    contactName: '',
     address: '3 rue Félix Savart',
     postalCode: '57070',
     city: 'METZ',
-    siren: '',
-    tvaNumber: '',
-    codeService: '',
   },
 ]
 
@@ -49,7 +63,9 @@ export function useClients() {
         await storage.saveClients(seeded)
         setClients(seeded)
       } else {
-        setClients(saved)
+        // Compat rétro : ajoute les nouveaux champs manquants sur les clients déjà sauvegardés
+        const normalized = saved.map(normalizeClient)
+        setClients(normalized)
       }
     })
   }, [])

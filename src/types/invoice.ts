@@ -36,10 +36,16 @@ export interface IssuerProfile {
 export interface ClientInfo {
   companyName: string
   contactName: string
+  legalForm: string
   address: string
   postalCode: string
   city: string
+  phone: string
+  email: string
+  website: string
+  siret: string
   siren: string
+  apeNaf: string
   tvaNumber: string
   codeService: string
 }
@@ -107,10 +113,16 @@ export interface ClientRecord {
   id: string
   companyName: string
   contactName: string
+  legalForm: string
   address: string
   postalCode: string
   city: string
+  phone: string
+  email: string
+  website: string
+  siret: string
   siren: string
+  apeNaf: string
   tvaNumber: string
   codeService: string
 }

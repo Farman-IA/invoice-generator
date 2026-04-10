@@ -294,6 +294,9 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 />
               </div>
               <div className="mt-2 space-y-0.5 text-xs text-gray-600">
+                <LabeledField label="Tél." value={client.phone} onChange={(v) => onUpdateClient({ phone: v })} placeholder={PLACEHOLDERS.client.phone} />
+                <LabeledField label="Email" value={client.email} onChange={(v) => onUpdateClient({ email: v })} placeholder={PLACEHOLDERS.client.email} />
+                <LabeledField label="SIRET" value={client.siret} onChange={(v) => onUpdateClient({ siret: v })} placeholder={PLACEHOLDERS.client.siret} />
                 <LabeledField label="SIREN" value={client.siren} onChange={(v) => onUpdateClient({ siren: v })} placeholder={PLACEHOLDERS.client.siren} />
                 <LabeledField label="TVA" value={client.tvaNumber} onChange={(v) => onUpdateClient({ tvaNumber: v })} placeholder={PLACEHOLDERS.client.tvaNumber} />
                 <LabeledField label="Code service" value={client.codeService} onChange={(v) => onUpdateClient({ codeService: v })} placeholder={PLACEHOLDERS.client.codeService} />
