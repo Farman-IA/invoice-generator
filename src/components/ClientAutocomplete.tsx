@@ -35,16 +35,9 @@ export function ClientAutocomplete({
   }, [])
 
   const handleSelect = (client: ClientRecord) => {
-    onSelectClient({
-      companyName: client.companyName,
-      contactName: client.contactName,
-      address: client.address,
-      postalCode: client.postalCode,
-      city: client.city,
-      siren: client.siren,
-      tvaNumber: client.tvaNumber,
-      codeService: client.codeService,
-    })
+    const { id: _id, ...clientInfo } = client
+    void _id
+    onSelectClient(clientInfo)
     setIsOpen(false)
   }
 
