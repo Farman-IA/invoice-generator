@@ -83,6 +83,12 @@ export function getDefaultClient(): ClientInfo {
   }
 }
 
+// Garantit que les anciens clients charges depuis le storage ont tous les champs
+// actuels (avec chaine vide par defaut pour les champs manquants).
+export function normalizeClientInfo(client: Partial<ClientInfo> | undefined): ClientInfo {
+  return { ...getDefaultClient(), ...client }
+}
+
 export function createDefaultLineItem(): LineItem {
   return {
     id: crypto.randomUUID(),

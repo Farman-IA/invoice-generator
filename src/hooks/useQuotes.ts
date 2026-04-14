@@ -15,7 +15,14 @@ import {
   getDefaultQuote,
   createDefaultLineItem,
   generateQuoteNumber,
+  normalizeClientInfo,
 } from '@/lib/constants'
+
+// Migre un devis charge depuis le storage : garantit que son client possede
+// tous les champs actuels (ex: department, addressLine2 ajoutes apres coup).
+function normalizeSavedQuote(qt: SavedQuote): SavedQuote {
+  return { ...qt, client: normalizeClientInfo(qt.client) }
+}
 
 interface QuoteState {
   issuer: IssuerProfile
@@ -48,11 +55,13 @@ export function useQuotes() {
   // Charger au montage
   useEffect(() => {
     async function load() {
-      const [quotes, counter, issuer] = await Promise.all([
+      const [rawQuotes, counter, issuer] = await Promise.all([
         storage.getQuotes(),
         storage.getQuoteCounter(),
         storage.getIssuerProfile(),
       ])
+      // Compat retro : ajoute les nouveaux champs client manquants
+      const quotes = rawQuotes.map(normalizeSavedQuote)
       setSavedQuotes(quotes)
       savedQuotesRef.current = quotes
       setState(prev => ({

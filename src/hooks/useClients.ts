@@ -2,34 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import type { ClientRecord } from '@/types/invoice'
 import { storage } from '@/lib/storage'
+import { getDefaultClient } from '@/lib/constants'
 
-const EMPTY_CLIENT_FIELDS = {
-  department: '',
-  contactName: '',
-  legalForm: '',
-  address: '',
-  addressLine2: '',
-  postalCode: '',
-  city: '',
-  phone: '',
-  email: '',
-  website: '',
-  siret: '',
-  siren: '',
-  apeNaf: '',
-  tvaNumber: '',
-  codeService: '',
-}
-
-// Normalise un client chargé depuis le storage pour garantir que
-// tous les nouveaux champs existent même sur les anciennes données.
+// Normalise un client charge depuis le storage : garantit que tous les champs
+// actuels existent (source de verite = getDefaultClient) meme sur les anciennes donnees.
 function normalizeClient(client: Partial<ClientRecord> & { id: string; companyName: string }): ClientRecord {
-  return { ...EMPTY_CLIENT_FIELDS, ...client } as ClientRecord
+  return { ...getDefaultClient(), ...client } as ClientRecord
 }
 
 const SEED_CLIENTS: Omit<ClientRecord, 'id'>[] = [
   {
-    ...EMPTY_CLIENT_FIELDS,
+    ...getDefaultClient(),
     companyName: 'Université de Lorraine',
     contactName: 'Agence Comptable/Bureau Facturier',
     address: '91 Avenue de la Libération',
@@ -37,14 +20,14 @@ const SEED_CLIENTS: Omit<ClientRecord, 'id'>[] = [
     city: 'NANCY CEDEX',
   },
   {
-    ...EMPTY_CLIENT_FIELDS,
+    ...getDefaultClient(),
     companyName: 'APAVE Exploitation France',
     address: 'ZI Avenue Gay Lussac BP3',
     postalCode: '33370',
     city: 'ARTIGUES PRES BORDEAUX',
   },
   {
-    ...EMPTY_CLIENT_FIELDS,
+    ...getDefaultClient(),
     companyName: 'Garden Golf Metz Technopôle',
     address: '3 rue Félix Savart',
     postalCode: '57070',

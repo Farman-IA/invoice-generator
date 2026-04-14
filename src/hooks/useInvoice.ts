@@ -17,7 +17,14 @@ import {
   getDefaultInvoice,
   createDefaultLineItem,
   generateInvoiceNumber,
+  normalizeClientInfo,
 } from '@/lib/constants'
+
+// Migre une facture chargee depuis le storage : garantit que son client possede
+// tous les champs actuels (ex: department, addressLine2 ajoutes apres coup).
+function normalizeSavedInvoice(inv: SavedInvoice): SavedInvoice {
+  return { ...inv, client: normalizeClientInfo(inv.client) }
+}
 
 // Date locale (évite le décalage UTC qui peut fausser les comparaisons de retard)
 function getLocalDate(): string {
@@ -54,11 +61,14 @@ export function useInvoice() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [invoices, counter, issuer] = await Promise.all([
+        const [rawInvoices, counter, issuer] = await Promise.all([
           storage.getInvoices(),
           storage.getCounter(),
           storage.getIssuerProfile(),
         ])
+
+        // Compat retro : ajoute les nouveaux champs client manquants (department, addressLine2, ...)
+        const invoices = rawInvoices.map(normalizeSavedInvoice)
 
         // Calcul auto du statut en_retard
         const today = getLocalDate()
