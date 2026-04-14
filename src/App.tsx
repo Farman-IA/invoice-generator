@@ -197,17 +197,18 @@ function App() {
         const matches = findByName(data.clientName)
         if (matches.length > 0) {
           const match = matches[0]
+          // L'IA peut enrichir un client existant : ses donnees non vides gagnent sur celles du carnet
           inv.updateClient({
             companyName: match.companyName,
-            department: match.department,
-            contactName: match.contactName,
-            address: match.address,
-            addressLine2: match.addressLine2,
-            postalCode: match.postalCode,
-            city: match.city,
+            department: data.clientDepartment || match.department,
+            contactName: data.contactName || match.contactName,
+            address: data.clientAddress || match.address,
+            addressLine2: data.clientAddressLine2 || match.addressLine2,
+            postalCode: data.clientPostalCode || match.postalCode,
+            city: data.clientCity || match.city,
             siren: match.siren,
             tvaNumber: match.tvaNumber,
-            codeService: match.codeService,
+            codeService: data.codeService || match.codeService,
           })
         } else if (isNewInvoice) {
           // Nouvelle facture : remplir tout
