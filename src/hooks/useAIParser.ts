@@ -200,6 +200,10 @@ function formatError(err: unknown): string {
     return 'Clé API invalide. Vérifiez-la dans Réglages → Mon profil.'
   if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
     return 'Quota API dépassé. La clé gratuite Gemini est limitée à ~15 requêtes/min. Attendez 1-2 minutes avant de réessayer.'
+  if (msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded'))
+    return 'Serveurs Gemini surchargés (503). Réessayez dans 30-60 secondes, ou basculez sur gemini-2.5-pro dans Réglages.'
+  if (msg.includes('500') || msg.includes('internal'))
+    return 'Erreur côté Google (500). Réessayez dans quelques instants.'
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed'))
     return 'Erreur réseau. Vérifiez votre connexion internet.'
   if (msg.includes('404') || msg.includes('model not found') || msg.includes('models/'))
