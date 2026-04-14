@@ -27,9 +27,17 @@ async function get<T>(key: string, fallback: T): Promise<T> {
 
 async function set(key: string, value: unknown): Promise<boolean> {
   try {
-    await window.storage.set(key, JSON.stringify(value))
+    const serialized = JSON.stringify(value)
+    await window.storage.set(key, serialized)
     return true
-  } catch {
+  } catch (err) {
+    console.error('[storage.set] échec pour la clé:', key, err)
+    const isQuota =
+      err instanceof DOMException &&
+      (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)
+    if (isQuota) {
+      toast.error('Stockage plein — libérez de l\'espace (supprimez d\'anciennes factures ou le logo)')
+    }
     return false
   }
 }
