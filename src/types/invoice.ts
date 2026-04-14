@@ -35,9 +35,11 @@ export interface IssuerProfile {
 
 export interface ClientInfo {
   companyName: string
+  department: string
   contactName: string
   legalForm: string
   address: string
+  addressLine2: string
   postalCode: string
   city: string
   phone: string
@@ -112,9 +114,11 @@ export type PaymentStatus = 'en_attente' | 'payee' | 'en_retard'
 export interface ClientRecord {
   id: string
   companyName: string
+  department: string
   contactName: string
   legalForm: string
   address: string
+  addressLine2: string
   postalCode: string
   city: string
   phone: string
@@ -146,7 +150,9 @@ export interface AISettings {
 
 export interface ParsedInvoiceData {
   clientName: string
+  clientDepartment?: string
   clientAddress?: string
+  clientAddressLine2?: string
   clientPostalCode?: string
   clientCity?: string
   contactName?: string

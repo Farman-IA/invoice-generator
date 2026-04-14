@@ -24,7 +24,9 @@ function formatAppliedData(data: ParsedInvoiceData): string {
   const lines: string[] = []
   if (data.clientName) {
     let clientLine = `Client : ${data.clientName}`
+    if (data.clientDepartment) clientLine += `\nService : ${data.clientDepartment}`
     if (data.clientAddress) clientLine += `\n${data.clientAddress}`
+    if (data.clientAddressLine2) clientLine += `\n${data.clientAddressLine2}`
     if (data.clientPostalCode || data.clientCity) clientLine += `\n${[data.clientPostalCode, data.clientCity].filter(Boolean).join(' ')}`
     if (data.contactName) clientLine += `\nContact : ${data.contactName}`
     lines.push(clientLine)
@@ -82,6 +84,15 @@ function DataPreview({ data, onApply, onCancel }: {
         </div>
       )}
 
+      {draft.clientDepartment !== undefined && (
+        <input
+          value={draft.clientDepartment ?? ''}
+          onChange={e => updateField('clientDepartment', e.target.value)}
+          className="w-full px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
+          placeholder="Service destinataire"
+        />
+      )}
+
       {/* Adresse sur une ligne */}
       <div className="grid grid-cols-3 gap-1">
         {draft.clientAddress !== undefined && (
@@ -91,6 +102,16 @@ function DataPreview({ data, onApply, onCancel }: {
               onChange={e => updateField('clientAddress', e.target.value)}
               className="w-full px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
               placeholder="Adresse"
+            />
+          </div>
+        )}
+        {draft.clientAddressLine2 !== undefined && (
+          <div className="col-span-3">
+            <input
+              value={draft.clientAddressLine2 ?? ''}
+              onChange={e => updateField('clientAddressLine2', e.target.value)}
+              className="w-full px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
+              placeholder="Complément d'adresse"
             />
           </div>
         )}

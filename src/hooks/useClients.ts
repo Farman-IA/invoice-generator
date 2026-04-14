@@ -4,9 +4,11 @@ import type { ClientRecord } from '@/types/invoice'
 import { storage } from '@/lib/storage'
 
 const EMPTY_CLIENT_FIELDS = {
+  department: '',
   contactName: '',
   legalForm: '',
   address: '',
+  addressLine2: '',
   postalCode: '',
   city: '',
   phone: '',

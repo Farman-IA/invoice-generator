@@ -199,8 +199,10 @@ function App() {
           const match = matches[0]
           inv.updateClient({
             companyName: match.companyName,
+            department: match.department,
             contactName: match.contactName,
             address: match.address,
+            addressLine2: match.addressLine2,
             postalCode: match.postalCode,
             city: match.city,
             siren: match.siren,
@@ -211,8 +213,10 @@ function App() {
           // Nouvelle facture : remplir tout
           inv.updateClient({
             companyName: data.clientName,
+            department: data.clientDepartment ?? '',
             contactName: data.contactName ?? '',
             address: data.clientAddress ?? '',
+            addressLine2: data.clientAddressLine2 ?? '',
             postalCode: data.clientPostalCode ?? '',
             city: data.clientCity ?? '',
             siren: '',
@@ -222,8 +226,10 @@ function App() {
         } else {
           // Modification : ne toucher QUE les champs fournis par l'IA
           const clientUpdate: Partial<ClientInfo> = { companyName: data.clientName }
+          if (data.clientDepartment) clientUpdate.department = data.clientDepartment
           if (data.contactName) clientUpdate.contactName = data.contactName
           if (data.clientAddress) clientUpdate.address = data.clientAddress
+          if (data.clientAddressLine2) clientUpdate.addressLine2 = data.clientAddressLine2
           if (data.clientPostalCode) clientUpdate.postalCode = data.clientPostalCode
           if (data.clientCity) clientUpdate.city = data.clientCity
           if (data.codeService) clientUpdate.codeService = data.codeService

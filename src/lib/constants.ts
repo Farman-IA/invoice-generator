@@ -65,9 +65,11 @@ export function getDefaultIssuer(): IssuerProfile {
 export function getDefaultClient(): ClientInfo {
   return {
     companyName: '',
+    department: '',
     contactName: '',
     legalForm: '',
     address: '',
+    addressLine2: '',
     postalCode: '',
     city: '',
     phone: '',
@@ -175,9 +177,11 @@ export const PLACEHOLDERS = {
   } as const,
   client: {
     companyName: 'Nom de la société client',
+    department: 'Service destinataire (ex: Factures Fournisseurs)',
     contactName: 'Nom du contact',
     legalForm: 'Statut (ex: SARL, SAS, EI)',
     address: 'Adresse du client',
+    addressLine2: 'Complément d\'adresse (ex: Tour / Bâtiment / BP)',
     postalCode: 'Code postal',
     city: 'Ville',
     phone: 'Téléphone',

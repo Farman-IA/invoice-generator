@@ -271,6 +271,11 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 />
               )}
               <InlineEdit
+                value={client.department ?? ''}
+                onChange={(v) => onUpdateClient({ department: v })}
+                placeholder={PLACEHOLDERS.client.department}
+              />
+              <InlineEdit
                 value={client.contactName}
                 onChange={(v) => onUpdateClient({ contactName: v })}
                 placeholder={PLACEHOLDERS.client.contactName}
@@ -279,6 +284,11 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
                 value={client.address}
                 onChange={(v) => onUpdateClient({ address: v })}
                 placeholder={PLACEHOLDERS.client.address}
+              />
+              <InlineEdit
+                value={client.addressLine2 ?? ''}
+                onChange={(v) => onUpdateClient({ addressLine2: v })}
+                placeholder={PLACEHOLDERS.client.addressLine2}
               />
               <div className="flex gap-2">
                 <InlineEdit

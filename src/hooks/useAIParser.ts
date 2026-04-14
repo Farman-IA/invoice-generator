@@ -15,10 +15,12 @@ function buildInvoiceSchema(priceMode: PriceMode) {
     properties: {
       message: { type: Type.STRING, description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
       clientName: { type: Type.STRING, description: 'Nom du client ou de l\'entreprise' },
+      clientDepartment: { type: Type.STRING, description: 'Service ou département destinataire chez le client (ex: "Factures Fournisseurs DCFG" pour Allianz Vie)' },
       clientAddress: { type: Type.STRING, description: 'Adresse du client (rue)' },
+      clientAddressLine2: { type: Type.STRING, description: 'Complément d\'adresse (ex: "Tour Neptune – Case courrier 0139", BP, bâtiment, étage)' },
       clientPostalCode: { type: Type.STRING, description: 'Code postal du client' },
       clientCity: { type: Type.STRING, description: 'Ville du client en MAJUSCULES' },
-      contactName: { type: Type.STRING, description: 'Nom du contact chez le client' },
+      contactName: { type: Type.STRING, description: 'Nom du contact chez le client (ex: "Danielle DEL AGUILA")' },
       purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande (ex: 4500821931 pour Univ Lorraine, 8000058218 pour APAVE)' },
       codeService: { type: Type.STRING, description: 'Code service Chorus Pro (obligatoire pour facturer l\'administration publique française, ex: UL1AVECEJ pour Université de Lorraine)' },
       notes: { type: Type.STRING, description: 'Notes ou commentaires' },
@@ -50,7 +52,7 @@ Tu dois quand même les mettre TELS QUELS dans unitPrice. La conversion TTC→HT
   return `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
 ## Quand le texte contient des données de facture :
-Extrait : clientName, clientAddress (si mentionnée), clientPostalCode (si mentionné), clientCity (si mentionnée), contactName (si mentionné), purchaseOrder (si mentionné), codeService (si mentionné, voir section Chorus Pro), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
+Extrait : clientName, clientDepartment (si un service/département est mentionné), clientAddress (si mentionnée), clientAddressLine2 (si l'adresse a une 2e ligne : Tour, BP, Case courrier, bâtiment, étage), clientPostalCode (si mentionné), clientCity (si mentionnée), contactName (si mentionné), purchaseOrder (si mentionné), codeService (si mentionné, voir section Chorus Pro), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
 Mets message à "" (vide).
 
 ${priceInstruction}
@@ -108,6 +110,13 @@ Exemples de questions → répondre avec message :
 - Siège : ZI Avenue Gay Lussac BP3, 33370 ARTIGUES PRES BORDEAUX
 - N° de commande APAVE : 10 chiffres commençant par 800 (ex: 8000058218) → purchaseOrder
 - Pas de code service Chorus Pro pour ce client.
+
+### Allianz Vie (assurance - grand compte)
+- Siège facturation : Tour Neptune – Case courrier 0139, 20 Place de Seine, 92086 PARIS LA DÉFENSE
+- Service destinataire : "Factures Fournisseurs DCFG" → remplis clientDepartment
+- Contact récurrent : Danielle DEL AGUILA → contactName
+- RÈGLE : "Tour Neptune – Case courrier 0139" va dans clientAddressLine2 (pas clientAddress), et "20 Place de Seine" va dans clientAddress
+- Exemple : clientName: "Allianz Vie", clientDepartment: "Factures Fournisseurs DCFG", contactName: "Danielle DEL AGUILA", clientAddress: "20 Place de Seine", clientAddressLine2: "Tour Neptune – Case courrier 0139", clientPostalCode: "92086", clientCity: "PARIS LA DÉFENSE"
 
 ### CIC / CAP COMPETENCES (formation professionnelle)
 - Contact récurrent : Alexiane BELMOSTEFAOUI
@@ -181,7 +190,9 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
 
   return {
     clientName: hasClient ? String(raw.clientName) : '',
+    clientDepartment: raw.clientDepartment ? String(raw.clientDepartment) : undefined,
     clientAddress: raw.clientAddress ? String(raw.clientAddress) : undefined,
+    clientAddressLine2: raw.clientAddressLine2 ? String(raw.clientAddressLine2) : undefined,
     clientPostalCode: raw.clientPostalCode ? String(raw.clientPostalCode) : undefined,
     clientCity: raw.clientCity ? String(raw.clientCity).toUpperCase() : undefined,
     contactName: raw.contactName ? String(raw.contactName) : undefined,

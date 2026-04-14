@@ -96,6 +96,12 @@ export function ClientsManager({ open, onOpenChange, clients, onUpdate, onDelete
                         onChange={setField('companyName')}
                         placeholder={PLACEHOLDERS.client.companyName}
                       />
+                      <Field
+                        label="Service destinataire"
+                        value={draft.department ?? ''}
+                        onChange={setField('department')}
+                        placeholder={PLACEHOLDERS.client.department}
+                      />
                       <div className="grid grid-cols-2 gap-2">
                         <Field
                           label="Contact"
@@ -119,6 +125,12 @@ export function ClientsManager({ open, onOpenChange, clients, onUpdate, onDelete
                         value={draft.address ?? ''}
                         onChange={setField('address')}
                         placeholder={PLACEHOLDERS.client.address}
+                      />
+                      <Field
+                        label="Complément d'adresse"
+                        value={draft.addressLine2 ?? ''}
+                        onChange={setField('addressLine2')}
+                        placeholder={PLACEHOLDERS.client.addressLine2}
                       />
                       <div className="grid grid-cols-3 gap-2">
                         <Field
