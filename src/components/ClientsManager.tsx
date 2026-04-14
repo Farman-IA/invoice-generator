@@ -121,16 +121,16 @@ export function ClientsManager({ open, onOpenChange, clients, onUpdate, onDelete
                     {/* Adresse */}
                     <div className="space-y-2">
                       <Field
-                        label="Adresse"
-                        value={draft.address ?? ''}
-                        onChange={setField('address')}
-                        placeholder={PLACEHOLDERS.client.address}
-                      />
-                      <Field
                         label="Complément d'adresse"
                         value={draft.addressLine2 ?? ''}
                         onChange={setField('addressLine2')}
                         placeholder={PLACEHOLDERS.client.addressLine2}
+                      />
+                      <Field
+                        label="Adresse"
+                        value={draft.address ?? ''}
+                        onChange={setField('address')}
+                        placeholder={PLACEHOLDERS.client.address}
                       />
                       <div className="grid grid-cols-3 gap-2">
                         <Field
