@@ -30,6 +30,7 @@ function formatAppliedData(data: ParsedInvoiceData): string {
     lines.push(clientLine)
   }
   if (data.purchaseOrder) lines.push(`Bon de commande : ${data.purchaseOrder}`)
+  if (data.codeService) lines.push(`Code service (Chorus Pro) : ${data.codeService}`)
   if (data.items?.length) {
     data.items.forEach(item => {
       lines.push(`+ ${item.quantity} × ${item.description} — ${item.unitPrice.toFixed(2)}€ HT — TVA ${item.vatRate}%`)

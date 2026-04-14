@@ -217,7 +217,7 @@ function App() {
             city: data.clientCity ?? '',
             siren: '',
             tvaNumber: '',
-            codeService: '',
+            codeService: data.codeService ?? '',
           })
         } else {
           // Modification : ne toucher QUE les champs fournis par l'IA
@@ -226,8 +226,12 @@ function App() {
           if (data.clientAddress) clientUpdate.address = data.clientAddress
           if (data.clientPostalCode) clientUpdate.postalCode = data.clientPostalCode
           if (data.clientCity) clientUpdate.city = data.clientCity
+          if (data.codeService) clientUpdate.codeService = data.codeService
           inv.updateClient(clientUpdate)
         }
+      } else if (data.codeService) {
+        // Pas de nouveau client mais l'IA a fourni un code service → l'appliquer au client courant
+        inv.updateClient({ codeService: data.codeService })
       }
 
       // Articles

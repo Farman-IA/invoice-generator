@@ -19,7 +19,8 @@ function buildInvoiceSchema(priceMode: PriceMode) {
       clientPostalCode: { type: Type.STRING, description: 'Code postal du client' },
       clientCity: { type: Type.STRING, description: 'Ville du client en MAJUSCULES' },
       contactName: { type: Type.STRING, description: 'Nom du contact chez le client' },
-      purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande' },
+      purchaseOrder: { type: Type.STRING, description: 'Numéro de bon de commande (ex: 4500821931 pour Univ Lorraine, 8000058218 pour APAVE)' },
+      codeService: { type: Type.STRING, description: 'Code service Chorus Pro (obligatoire pour facturer l\'administration publique française, ex: UL1AVECEJ pour Université de Lorraine)' },
       notes: { type: Type.STRING, description: 'Notes ou commentaires' },
       deposit: { type: Type.NUMBER, description: 'Montant de l\'acompte déjà versé par le client, en euros. 0 si aucun acompte.' },
       items: {
@@ -49,7 +50,7 @@ Tu dois quand même les mettre TELS QUELS dans unitPrice. La conversion TTC→HT
   return `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
 ## Quand le texte contient des données de facture :
-Extrait : clientName, clientAddress (si mentionnée), clientPostalCode (si mentionné), clientCity (si mentionnée), contactName (si mentionné), purchaseOrder (si mentionné), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
+Extrait : clientName, clientAddress (si mentionnée), clientPostalCode (si mentionné), clientCity (si mentionnée), contactName (si mentionné), purchaseOrder (si mentionné), codeService (si mentionné, voir section Chorus Pro), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
 Mets message à "" (vide).
 
 ${priceInstruction}
@@ -94,6 +95,26 @@ Exemples de questions → répondre avec message :
 ## Règles de formatage :
 - Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
 - Les prix sont des nombres décimaux (30.00, pas "30 euros").
+
+## Clients récurrents et leurs spécificités :
+
+### Université de Lorraine (Chorus Pro - administration publique)
+- Siège : 91 Avenue de la Libération, 54021 NANCY CEDEX
+- CONTEXTE : pour facturer une collectivité/université française via Chorus Pro, il faut OBLIGATOIREMENT un "Code service" au format UL1XXXXXX (ex: UL1AVECEJ). Sans lui, la facture est refusée.
+- Si l'utilisateur mentionne "code service", "Chorus", "UL1..." → remplis codeService
+- N° de commande Univ Lorraine : 10 chiffres commençant par 4500 (ex: 4500821931) → purchaseOrder
+
+### APAVE Exploitation France
+- Siège : ZI Avenue Gay Lussac BP3, 33370 ARTIGUES PRES BORDEAUX
+- N° de commande APAVE : 10 chiffres commençant par 800 (ex: 8000058218) → purchaseOrder
+- Pas de code service Chorus Pro pour ce client.
+
+### CIC / CAP COMPETENCES (formation professionnelle)
+- Contact récurrent : Alexiane BELMOSTEFAOUI
+- Adresse : 4 rue Frédéric-Guillaume RAIFFEISEN, 67913 Strasbourg Cedex 9
+- CONTEXTE : les factures CAP COMPETENCES contiennent TOUJOURS un "code session" au format XXXXXXX-XXXXXX-XXX (ex: 0028310-000062-001) associé à une date de prestation (ex: "14 repas complets le 21/01/2026 code session : 0028310-000062-001").
+- RÈGLE IMPORTANTE : PRÉSERVE INTÉGRALEMENT ce code session et la date dans le champ "description" de la ligne. NE l'extrais PAS dans un autre champ.
+- Exemple correct de ligne CIC : description: "Repas complet le 21/01/2026 code session : 0028310-000062-001", quantity: 14, unitPrice: 30, vatRate: 10
 
 ## MODIFICATIONS d'une facture existante :
 Quand le texte demande une MODIFICATION (changer, modifier, remplacer, mettre à jour, corriger) :
@@ -165,6 +186,7 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
     clientCity: raw.clientCity ? String(raw.clientCity).toUpperCase() : undefined,
     contactName: raw.contactName ? String(raw.contactName) : undefined,
     purchaseOrder: raw.purchaseOrder ? String(raw.purchaseOrder) : undefined,
+    codeService: raw.codeService ? String(raw.codeService) : undefined,
     notes: raw.notes ? String(raw.notes) : undefined,
     ...(depositValue > 0 ? { deposit: depositValue } : {}),
     items,
