@@ -41,7 +41,9 @@ async function set(key: string, value: unknown): Promise<SaveResult> {
       err instanceof DOMException &&
       (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)
     if (isQuota) {
-      toast.error('Stockage plein — supprimez d\'anciennes factures ou réduisez le logo')
+      // id stable : évite les toasts empilés quand plusieurs saves parallèles
+      // (ex: Promise.all dans duplicateInvoice) échouent sur le même quota.
+      toast.error('Stockage plein — supprimez d\'anciennes factures ou réduisez le logo', { id: 'storage-quota' })
       return { ok: false, reason: 'quota' }
     }
     return { ok: false, reason: 'unknown' }
