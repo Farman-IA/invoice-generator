@@ -254,7 +254,7 @@ export function useQuotes() {
     )
     setSavedQuotes(updated)
     savedQuotesRef.current = updated
-    const ok = await storage.saveQuotes(updated)
+    const result = await storage.saveQuotes(updated)
 
     // Mettre à jour le lock si c'est le devis courant
     if (id === currentQuoteIdRef.current) {
@@ -267,8 +267,8 @@ export function useQuotes() {
       accepté: 'Devis accepté',
       refusé: 'Devis refusé',
     }
-    if (!ok) {
-      toast.error('Erreur de sauvegarde')
+    if (!result.ok) {
+      if (result.reason === 'unknown') toast.error('Erreur de sauvegarde')
     } else {
       toast.success(labels[status])
     }
@@ -317,13 +317,17 @@ export function useQuotes() {
     currentQuoteIdRef.current = duplicated.id
     setIsLocked(false)
 
-    const [savOk, counterOk] = await Promise.all([
+    const [savResult, counterResult] = await Promise.all([
       storage.saveQuotes(updated),
       storage.saveQuoteCounter(newCounter),
     ])
-    if (!savOk || !counterOk) {
+    const hasUnknownError =
+      (!savResult.ok && savResult.reason === 'unknown') ||
+      (!counterResult.ok && counterResult.reason === 'unknown')
+    const hasAnyError = !savResult.ok || !counterResult.ok
+    if (hasUnknownError) {
       toast.error('Erreur de sauvegarde')
-    } else {
+    } else if (!hasAnyError) {
       toast.success('Devis dupliqué')
     }
   }, [])
@@ -333,9 +337,9 @@ export function useQuotes() {
     const updated = savedQuotesRef.current.filter(q => q.id !== id)
     setSavedQuotes(updated)
     savedQuotesRef.current = updated
-    const ok = await storage.saveQuotes(updated)
-    if (!ok) {
-      toast.error('Erreur de sauvegarde')
+    const result = await storage.saveQuotes(updated)
+    if (!result.ok) {
+      if (result.reason === 'unknown') toast.error('Erreur de sauvegarde')
       return
     }
 
@@ -371,9 +375,9 @@ export function useQuotes() {
     )
     setSavedQuotes(updated)
     savedQuotesRef.current = updated
-    const ok = await storage.saveQuotes(updated)
-    if (!ok) {
-      console.error('Erreur de liaison devis → facture')
+    const result = await storage.saveQuotes(updated)
+    if (!result.ok) {
+      console.error('Erreur de liaison devis → facture', result.reason)
     }
   }, [])
 

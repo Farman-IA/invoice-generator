@@ -14,6 +14,11 @@ const KEYS = {
   AI_SETTINGS: 'ai-settings',
 } as const
 
+// Résultat d'une sauvegarde — permet aux appelants de distinguer un quota
+// (toast spécifique déjà affiché par storage) d'une erreur inconnue (toast
+// générique à gérer par l'appelant).
+export type SaveResult = { ok: true } | { ok: false; reason: 'quota' | 'unknown' }
+
 async function get<T>(key: string, fallback: T): Promise<T> {
   try {
     const result = await window.storage.get(key)
@@ -25,20 +30,21 @@ async function get<T>(key: string, fallback: T): Promise<T> {
   }
 }
 
-async function set(key: string, value: unknown): Promise<boolean> {
+async function set(key: string, value: unknown): Promise<SaveResult> {
   try {
     const serialized = JSON.stringify(value)
     await window.storage.set(key, serialized)
-    return true
+    return { ok: true }
   } catch (err) {
     console.error('[storage.set] échec pour la clé:', key, err)
     const isQuota =
       err instanceof DOMException &&
       (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)
     if (isQuota) {
-      toast.error('Stockage plein — libérez de l\'espace (supprimez d\'anciennes factures ou le logo)')
+      toast.error('Stockage plein — supprimez d\'anciennes factures ou réduisez le logo')
+      return { ok: false, reason: 'quota' }
     }
-    return false
+    return { ok: false, reason: 'unknown' }
   }
 }
 

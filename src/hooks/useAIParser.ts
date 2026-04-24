@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GoogleGenAI, Type } from '@google/genai'
+import { toast } from 'sonner'
 import { storage } from '@/lib/storage'
 import type { AISettings, ParsedInvoiceData, VatRate, PriceMode } from '@/types/invoice'
 
@@ -204,6 +205,32 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
   }
 }
 
+// Retry automatique sur 503 (serveurs Gemini surchargés) :
+// jusqu'à 2 nouvelles tentatives (attente 2s puis 4s). Le timeout
+// de 30s s'applique PAR tentative, pas au total.
+async function generateWithRetry(
+  ai: GoogleGenAI,
+  params: Parameters<GoogleGenAI['models']['generateContent']>[0],
+  maxRetries = 2,
+): Promise<Awaited<ReturnType<GoogleGenAI['models']['generateContent']>>> {
+  let attempt = 0
+  while (true) {
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout : l\'IA n\'a pas répondu en 30 secondes')), 30000)
+      )
+      return await Promise.race([ai.models.generateContent(params), timeoutPromise])
+    } catch (err) {
+      const isOverload = err instanceof Error && /503|unavailable|overloaded/i.test(err.message)
+      if (!isOverload || attempt >= maxRetries) throw err
+      attempt++
+      const delayMs = 2000 * Math.pow(2, attempt - 1) // 2000ms puis 4000ms
+      toast.info(`Gemini surchargé — nouvelle tentative dans ${Math.round(delayMs / 1000)}s…`)
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+  }
+}
+
 function formatError(err: unknown): string {
   if (!(err instanceof Error)) return 'Erreur inattendue. Réessayez.'
   const msg = err.message.toLowerCase()
@@ -298,21 +325,14 @@ export function useAIParser() {
 
       prompt += `\n\nNouveau message :\n${text}`
 
-      // Timeout 30s pour éviter de bloquer l'utilisateur indéfiniment
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout : l\'IA n\'a pas répondu en 30 secondes')), 30000)
-      )
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model: currentSettings.model,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: buildInvoiceSchema(priceMode),
-          },
-        }),
-        timeoutPromise,
-      ])
+      const response = await generateWithRetry(ai, {
+        model: currentSettings.model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: buildInvoiceSchema(priceMode),
+        },
+      })
 
       let raw: Record<string, unknown>
       try {

@@ -292,9 +292,11 @@ export function useInvoice() {
     setSavedInvoices(updated)
     savedInvoicesRef.current = updated
 
-    const ok = await storage.saveInvoices(updated)
+    const result = await storage.saveInvoices(updated)
     await storage.saveCounter(current.counter)
-    if (!ok) toast.error('Erreur de sauvegarde')
+    // Si quota, storage a déjà affiché le toast précis — n'ajoute le toast
+    // générique que pour les erreurs inconnues.
+    if (!result.ok && result.reason === 'unknown') toast.error('Erreur de sauvegarde')
 
     return resultId
   }, [])
@@ -400,13 +402,17 @@ export function useInvoice() {
     setIsFinalized(false)
     setView('EDIT')
 
-    const [saveOk, counterOk] = await Promise.all([
+    const [saveResult, counterResult] = await Promise.all([
       storage.saveInvoices(updated),
       storage.saveCounter(newCounter),
     ])
-    if (!saveOk || !counterOk) {
+    const hasUnknownError =
+      (!saveResult.ok && saveResult.reason === 'unknown') ||
+      (!counterResult.ok && counterResult.reason === 'unknown')
+    const hasQuotaError = !saveResult.ok || !counterResult.ok
+    if (hasUnknownError) {
       toast.error('Erreur de sauvegarde')
-    } else {
+    } else if (!hasQuotaError) {
       toast.success('Facture dupliquée')
     }
     } finally {
@@ -420,9 +426,9 @@ export function useInvoice() {
     setSavedInvoices(updated)
     savedInvoicesRef.current = updated
 
-    const ok = await storage.saveInvoices(updated)
-    if (!ok) {
-      toast.error('Erreur de sauvegarde')
+    const result = await storage.saveInvoices(updated)
+    if (!result.ok) {
+      if (result.reason === 'unknown') toast.error('Erreur de sauvegarde')
       return
     }
 
@@ -448,9 +454,9 @@ export function useInvoice() {
     )
     setSavedInvoices(updated)
     savedInvoicesRef.current = updated
-    const ok = await storage.saveInvoices(updated)
-    if (!ok) {
-      toast.error('Erreur de sauvegarde')
+    const result = await storage.saveInvoices(updated)
+    if (!result.ok) {
+      if (result.reason === 'unknown') toast.error('Erreur de sauvegarde')
     } else {
       toast.success('Facture marquée comme payée')
     }
@@ -485,9 +491,9 @@ export function useInvoice() {
     setIsFinalized(false)
     setView('EDIT')
 
-    const ok = await storage.saveCounter(newCounter)
-    if (!ok) {
-      toast.error('Erreur de sauvegarde du compteur')
+    const result = await storage.saveCounter(newCounter)
+    if (!result.ok) {
+      if (result.reason === 'unknown') toast.error('Erreur de sauvegarde du compteur')
     } else {
       toast.success('Nouvelle facture créée')
     }

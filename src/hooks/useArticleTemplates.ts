@@ -24,16 +24,16 @@ export function useArticleTemplates() {
     const updated = templatesRef.current.map(t => t.id === id ? { ...t, ...partial } : t)
     setTemplates(updated)
     templatesRef.current = updated
-    const ok = await storage.saveArticleTemplates(updated)
-    if (!ok) console.error('Erreur de sauvegarde modèle')
+    const result = await storage.saveArticleTemplates(updated)
+    if (!result.ok) console.error('Erreur de sauvegarde modèle', result.reason)
   }, [])
 
   const deleteTemplate = useCallback(async (id: string) => {
     const updated = templatesRef.current.filter(t => t.id !== id)
     setTemplates(updated)
     templatesRef.current = updated
-    const ok = await storage.saveArticleTemplates(updated)
-    if (!ok) console.error('Erreur de suppression modèle')
+    const result = await storage.saveArticleTemplates(updated)
+    if (!result.ok) console.error('Erreur de suppression modèle', result.reason)
   }, [])
 
   return { templates, addTemplate, updateTemplate, deleteTemplate }
