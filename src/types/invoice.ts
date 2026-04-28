@@ -141,10 +141,17 @@ export interface ArticleTemplate {
 
 export type PriceMode = 'ht' | 'ttc'
 
+export type AIProvider = 'google' | 'openai'
+
+export type GoogleModel = 'gemini-2.5-flash' | 'gemini-2.5-pro'
+export type OpenAIModel = 'gpt-4o-mini' | 'gpt-4o'
+export type AIModel = GoogleModel | OpenAIModel
+
 export interface AISettings {
   apiKey: string
   apiKeyValid?: boolean
-  model: 'gemini-2.5-flash' | 'gemini-2.5-pro'
+  provider?: AIProvider
+  model: AIModel
   priceMode: PriceMode
 }
 

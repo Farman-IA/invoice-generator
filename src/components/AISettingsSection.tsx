@@ -3,16 +3,38 @@ import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { storage } from '@/lib/storage'
 import { validateApiKey } from '@/hooks/useAIParser'
-import type { AISettings, PriceMode } from '@/types/invoice'
+import type { AISettings, AIProvider, AIModel, PriceMode } from '@/types/invoice'
 
 interface AISettingsSectionProps {
   onSettingsChange?: (settings: AISettings) => void
 }
 
-const MODELS: { value: AISettings['model']; label: string }[] = [
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (rapide, économique)' },
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (plus précis)' },
+const PROVIDERS: { value: AIProvider; label: string; keyHint: string; keyUrl: string }[] = [
+  { value: 'google', label: 'Google Gemini', keyHint: 'AIza...', keyUrl: 'https://aistudio.google.com/apikey' },
+  { value: 'openai', label: 'OpenAI (ChatGPT)', keyHint: 'sk-...', keyUrl: 'https://platform.openai.com/api-keys' },
 ]
+
+const MODELS_BY_PROVIDER: Record<AIProvider, { value: AIModel; label: string }[]> = {
+  google: [
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (rapide, économique)' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (plus précis)' },
+  ],
+  openai: [
+    { value: 'gpt-4o-mini', label: 'GPT-4o mini (rapide, économique — recommandé)' },
+    { value: 'gpt-4o', label: 'GPT-4o (plus précis, plus cher)' },
+  ],
+}
+
+const DEFAULT_MODEL: Record<AIProvider, AIModel> = {
+  google: 'gemini-2.5-flash',
+  openai: 'gpt-4o-mini',
+}
+
+function inferProvider(settings: { provider?: AIProvider; model: AIModel } | null): AIProvider {
+  if (settings?.provider) return settings.provider
+  if (settings?.model?.startsWith('gpt')) return 'openai'
+  return 'google'
+}
 
 const PRICE_MODES: { value: PriceMode; label: string; description: string }[] = [
   { value: 'ht', label: 'HT (hors taxe)', description: 'Les montants dictés sont déjà hors taxe' },
@@ -20,8 +42,9 @@ const PRICE_MODES: { value: PriceMode; label: string; description: string }[] = 
 ]
 
 export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) {
+  const [provider, setProvider] = useState<AIProvider>('google')
   const [apiKey, setApiKey] = useState('')
-  const [model, setModel] = useState<AISettings['model']>('gemini-2.5-flash')
+  const [model, setModel] = useState<AIModel>('gemini-2.5-flash')
   const [priceMode, setPriceMode] = useState<PriceMode>('ht')
   const [showKey, setShowKey] = useState(false)
   const [validating, setValidating] = useState(false)
@@ -32,6 +55,8 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
   useEffect(() => {
     storage.getAISettings().then(settings => {
       if (settings) {
+        const inferred = inferProvider(settings)
+        setProvider(inferred)
         setApiKey(settings.apiKey)
         setModel(settings.model)
         setPriceMode(settings.priceMode ?? 'ht')
@@ -41,8 +66,14 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
     })
   }, [])
 
-  const save = (key: string, mod: AISettings['model'], price: PriceMode, valid?: boolean) => {
-    const newSettings: AISettings = { apiKey: key, apiKeyValid: valid ?? keyValid ?? undefined, model: mod, priceMode: price }
+  const save = (prov: AIProvider, key: string, mod: AIModel, price: PriceMode, valid?: boolean) => {
+    const newSettings: AISettings = {
+      provider: prov,
+      apiKey: key,
+      apiKeyValid: valid ?? keyValid ?? undefined,
+      model: mod,
+      priceMode: price,
+    }
     storage.saveAISettings(newSettings)
     onSettingsChange?.(newSettings)
   }
@@ -52,33 +83,47 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
     if (!trimmed) {
       setKeyValid(null)
       setValidationError(null)
-      save(trimmed, model, priceMode, undefined)
+      save(provider, trimmed, model, priceMode, undefined)
       prevKeyRef.current = trimmed
       return
     }
     if (trimmed === prevKeyRef.current && keyValid !== null) {
-      save(trimmed, model, priceMode, keyValid)
+      save(provider, trimmed, model, priceMode, keyValid)
       return
     }
     setValidating(true)
     setValidationError(null)
-    const result = await validateApiKey(trimmed, model)
+    const result = await validateApiKey(trimmed, provider)
     setKeyValid(result.isValid)
     setValidationError(result.error)
     setValidating(false)
-    save(trimmed, model, priceMode, result.isValid)
+    save(provider, trimmed, model, priceMode, result.isValid)
     prevKeyRef.current = trimmed
   }
 
-  const handleModelChange = (value: AISettings['model']) => {
+  const handleProviderChange = (value: AIProvider) => {
+    setProvider(value)
+    // À chaque switch de provider, on remet le modèle par défaut et on invalide la clé
+    // (la clé Gemini ne marche pas pour OpenAI et inversement).
+    const newModel = DEFAULT_MODEL[value]
+    setModel(newModel)
+    setKeyValid(null)
+    setValidationError(null)
+    save(value, apiKey, newModel, priceMode, undefined)
+  }
+
+  const handleModelChange = (value: AIModel) => {
     setModel(value)
-    save(apiKey, value, priceMode)
+    save(provider, apiKey, value, priceMode)
   }
 
   const handlePriceModeChange = (value: PriceMode) => {
     setPriceMode(value)
-    save(apiKey, model, value)
+    save(provider, apiKey, model, value)
   }
+
+  const currentProvider = PROVIDERS.find(p => p.value === provider)!
+  const currentModels = MODELS_BY_PROVIDER[provider]
 
   return (
     <div>
@@ -87,7 +132,38 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
       </h3>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
-          <label htmlFor="ai-api-key" className="text-xs text-gray-500 dark:text-gray-400">Clé API Google</label>
+          <label id="ai-provider" className="text-xs text-gray-500 dark:text-gray-400">Fournisseur d'IA</label>
+          <div role="group" aria-labelledby="ai-provider" className="flex gap-2 mt-1">
+            {PROVIDERS.map(p => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => handleProviderChange(p.value)}
+                aria-pressed={provider === p.value}
+                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                  provider === p.value
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="col-span-2">
+          <label htmlFor="ai-api-key" className="text-xs text-gray-500 dark:text-gray-400">
+            Clé API {currentProvider.label}
+            {' '}
+            <a
+              href={currentProvider.keyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              (obtenir)
+            </a>
+          </label>
           <div className="relative">
             <input
               id="ai-api-key"
@@ -95,7 +171,7 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
               value={apiKey}
               onChange={e => { setApiKey(e.target.value); if (keyValid !== null) setKeyValid(null) }}
               onBlur={handleApiKeyBlur}
-              placeholder="AIza..."
+              placeholder={currentProvider.keyHint}
               className={`w-full px-2 py-1.5 pr-16 text-sm border rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 ${
                 keyValid === true ? 'border-green-400 dark:border-green-600 focus:ring-green-200 dark:focus:ring-green-800'
                 : keyValid === false ? 'border-red-400 dark:border-red-600 focus:ring-red-200 dark:focus:ring-red-800'
@@ -129,10 +205,10 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
           <select
             id="ai-model"
             value={model}
-            onChange={e => handleModelChange(e.target.value as AISettings['model'])}
+            onChange={e => handleModelChange(e.target.value as AIModel)}
             className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           >
-            {MODELS.map(m => (
+            {currentModels.map(m => (
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
           </select>

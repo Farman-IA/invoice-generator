@@ -20,8 +20,12 @@ self.addEventListener('activate', (event) => {
 
 // Strategie : reseau d'abord, cache en secours (pour que l'app marche hors-ligne)
 self.addEventListener('fetch', (event) => {
-  // Ignorer les requetes API (Gemini)
-  if (event.request.url.includes('generativelanguage.googleapis.com')) return
+  // Ignorer les requetes API (Gemini et OpenAI) — ne jamais cacher les reponses IA
+  const url = event.request.url
+  if (
+    url.includes('generativelanguage.googleapis.com') ||
+    url.includes('api.openai.com')
+  ) return
 
   event.respondWith(
     fetch(event.request)

@@ -1,8 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GoogleGenAI, Type } from '@google/genai'
+import OpenAI from 'openai'
 import { toast } from 'sonner'
 import { storage } from '@/lib/storage'
-import type { AISettings, ParsedInvoiceData, VatRate, PriceMode } from '@/types/invoice'
+import type { AISettings, AIProvider, AIModel, ParsedInvoiceData, VatRate, PriceMode } from '@/types/invoice'
+
+function getProvider(settings: Pick<AISettings, 'provider' | 'model'>): AIProvider {
+  if (settings.provider) return settings.provider
+  return settings.model.startsWith('gpt') ? 'openai' : 'google'
+}
 
 const VALID_VAT_RATES: VatRate[] = [0, 2.1, 5.5, 10, 20]
 
@@ -42,6 +48,50 @@ function buildInvoiceSchema(priceMode: PriceMode) {
     },
     required: ['message'],
   }
+}
+
+function buildOpenAIInvoiceSchema(priceMode: PriceMode) {
+  const priceDesc = priceMode === 'ttc'
+    ? 'Prix unitaire TTC en euros (tel que donné par l\'utilisateur, NE PAS convertir)'
+    : 'Prix unitaire HT en euros'
+
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      message: { type: ['string', 'null'], description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
+      clientName: { type: ['string', 'null'], description: 'Nom du client ou de l\'entreprise' },
+      clientDepartment: { type: ['string', 'null'], description: 'Service ou département destinataire chez le client' },
+      clientAddress: { type: ['string', 'null'], description: 'Adresse du client (rue)' },
+      clientAddressLine2: { type: ['string', 'null'], description: 'Complément d\'adresse (Tour, BP, Case courrier, bâtiment, étage)' },
+      clientPostalCode: { type: ['string', 'null'], description: 'Code postal du client' },
+      clientCity: { type: ['string', 'null'], description: 'Ville du client en MAJUSCULES' },
+      contactName: { type: ['string', 'null'], description: 'Nom du contact chez le client' },
+      purchaseOrder: { type: ['string', 'null'], description: 'Numéro de bon de commande' },
+      codeService: { type: ['string', 'null'], description: 'Code service Chorus Pro' },
+      notes: { type: ['string', 'null'], description: 'Notes ou commentaires' },
+      deposit: { type: ['number', 'null'], description: 'Montant de l\'acompte déjà versé en euros, ou null si aucun' },
+      items: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            description: { type: 'string', description: 'Description de la prestation ou du produit' },
+            quantity: { type: 'number', description: 'Quantité' },
+            unitPrice: { type: 'number', description: priceDesc },
+            vatRate: { type: 'number', description: 'Taux de TVA : 0, 2.1, 5.5, 10 ou 20' },
+          },
+          required: ['description', 'quantity', 'unitPrice', 'vatRate'],
+        },
+      },
+    },
+    required: [
+      'message', 'clientName', 'clientDepartment', 'clientAddress',
+      'clientAddressLine2', 'clientPostalCode', 'clientCity', 'contactName',
+      'purchaseOrder', 'codeService', 'notes', 'deposit', 'items',
+    ],
+  } as const
 }
 
 function buildSystemPrompt(priceMode: PriceMode): string {
@@ -205,43 +255,90 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
   }
 }
 
-// Retry automatique sur 503 (serveurs Gemini surchargés) :
+// Retry automatique sur 503 (serveurs surchargés) :
 // jusqu'à 2 nouvelles tentatives (attente 2s puis 4s). Le timeout
 // de 30s s'applique PAR tentative, pas au total.
-async function generateWithRetry(
-  ai: GoogleGenAI,
-  params: Parameters<GoogleGenAI['models']['generateContent']>[0],
+async function callWithRetry<T>(
+  fn: () => Promise<T>,
+  providerLabel: string,
   maxRetries = 2,
-): Promise<Awaited<ReturnType<GoogleGenAI['models']['generateContent']>>> {
+): Promise<T> {
   let attempt = 0
   while (true) {
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Timeout : l\'IA n\'a pas répondu en 30 secondes')), 30000)
       )
-      return await Promise.race([ai.models.generateContent(params), timeoutPromise])
+      return await Promise.race([fn(), timeoutPromise])
     } catch (err) {
       const isOverload = err instanceof Error && /503|unavailable|overloaded/i.test(err.message)
       if (!isOverload || attempt >= maxRetries) throw err
       attempt++
       const delayMs = 2000 * Math.pow(2, attempt - 1) // 2000ms puis 4000ms
-      toast.info(`Gemini surchargé — nouvelle tentative dans ${Math.round(delayMs / 1000)}s…`)
+      toast.info(`${providerLabel} surchargé — nouvelle tentative dans ${Math.round(delayMs / 1000)}s…`)
       await new Promise(resolve => setTimeout(resolve, delayMs))
     }
   }
 }
 
-function formatError(err: unknown): string {
+async function callGemini(apiKey: string, model: AIModel, prompt: string, priceMode: PriceMode): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey })
+  const response = await callWithRetry(
+    () => ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: buildInvoiceSchema(priceMode),
+      },
+    }),
+    'Gemini',
+  )
+  return response.text ?? '{}'
+}
+
+async function callOpenAI(apiKey: string, model: AIModel, systemPrompt: string, userText: string, priceMode: PriceMode): Promise<string> {
+  const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+  const response = await callWithRetry(
+    () => openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userText },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'invoice_data',
+          strict: true,
+          schema: buildOpenAIInvoiceSchema(priceMode),
+        },
+      },
+    }),
+    'OpenAI',
+  )
+  return response.choices[0]?.message?.content ?? '{}'
+}
+
+function formatError(err: unknown, provider: AIProvider): string {
   if (!(err instanceof Error)) return 'Erreur inattendue. Réessayez.'
   const msg = err.message.toLowerCase()
+  const isGoogle = provider === 'google'
+  const providerName = isGoogle ? 'Gemini' : 'OpenAI'
   if (msg.includes('api key') || msg.includes('401') || msg.includes('unauthorized'))
     return 'Clé API invalide. Vérifiez-la dans Réglages → Mon profil.'
-  if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
-    return 'Quota API dépassé. La clé gratuite Gemini est limitée à ~15 requêtes/min. Attendez 1-2 minutes avant de réessayer.'
-  if (msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded'))
-    return 'Serveurs Gemini surchargés (503). Réessayez dans 30-60 secondes, ou basculez sur gemini-2.5-pro dans Réglages.'
+  if (msg.includes('429') || msg.includes('rate') || msg.includes('quota')) {
+    if (isGoogle)
+      return 'Quota API dépassé. La clé gratuite Gemini est limitée à ~15 requêtes/min. Attendez 1-2 minutes avant de réessayer.'
+    return 'Quota OpenAI dépassé ou crédits insuffisants. Vérifiez vos crédits sur platform.openai.com/billing.'
+  }
+  if (msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded')) {
+    if (isGoogle)
+      return 'Serveurs Gemini surchargés (503). Réessayez dans 30-60 secondes, ou basculez sur OpenAI dans Réglages.'
+    return 'Serveurs OpenAI surchargés (503). Réessayez dans 30-60 secondes, ou basculez sur Gemini dans Réglages.'
+  }
   if (msg.includes('500') || msg.includes('internal'))
-    return 'Erreur côté Google (500). Réessayez dans quelques instants.'
+    return `Erreur côté ${providerName} (500). Réessayez dans quelques instants.`
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed'))
     return 'Erreur réseau. Vérifiez votre connexion internet.'
   if (msg.includes('404') || msg.includes('model not found') || msg.includes('models/'))
@@ -254,21 +351,48 @@ export interface ApiKeyValidationResult {
   error: string | null
 }
 
-export async function validateApiKey(apiKey: string, model: AISettings['model'] = 'gemini-2.5-flash'): Promise<ApiKeyValidationResult> {
+function inferProviderFromKey(apiKey: string): AIProvider {
+  const trimmed = apiKey.trim()
+  if (trimmed.startsWith('sk-')) return 'openai'
+  if (trimmed.startsWith('AIza')) return 'google'
+  return 'google'
+}
+
+export async function validateApiKey(
+  apiKey: string,
+  providerOrModel: AIProvider | AIModel = 'google',
+): Promise<ApiKeyValidationResult> {
   if (!apiKey.trim()) return { isValid: false, error: 'Clé API vide.' }
 
+  // Compatibilité ascendante : si on reçoit un nom de modèle, on déduit le provider.
+  let provider: AIProvider
+  if (providerOrModel === 'google' || providerOrModel === 'openai') {
+    provider = providerOrModel
+  } else {
+    provider = providerOrModel.startsWith('gpt') ? 'openai' : 'google'
+  }
+
   try {
-    const ai = new GoogleGenAI({ apiKey })
-    await ai.models.generateContent({
-      model,
-      contents: 'Réponds juste "ok".',
-      config: { maxOutputTokens: 5 },
-    })
+    if (provider === 'openai') {
+      const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+      await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Réponds juste "ok".' }],
+        max_tokens: 5,
+      })
+    } else {
+      const ai = new GoogleGenAI({ apiKey })
+      await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: 'Réponds juste "ok".',
+        config: { maxOutputTokens: 5 },
+      })
+    }
     return { isValid: true, error: null }
   } catch (err) {
     if (!(err instanceof Error)) return { isValid: false, error: 'Erreur inconnue.' }
     const msg = err.message.toLowerCase()
-    if (msg.includes('api key') || msg.includes('401') || msg.includes('unauthorized'))
+    if (msg.includes('api key') || msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid_api_key'))
       return { isValid: false, error: 'Clé API invalide.' }
     if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
       return { isValid: true, error: null } // quota = clé valide mais limitée
@@ -277,6 +401,9 @@ export async function validateApiKey(apiKey: string, model: AISettings['model'] 
     return { isValid: false, error: `Erreur : ${err.message.substring(0, 80)}` }
   }
 }
+
+// Exporté pour permettre à l'UI inline (AIChatPanel) de déduire le provider depuis la clé saisie.
+export { inferProviderFromKey }
 
 export interface AIParseResult {
   data: ParsedInvoiceData | null
@@ -307,36 +434,34 @@ export function useAIParser() {
     }
 
     setIsLoading(true)
+    const provider = getProvider(currentSettings)
 
     try {
-      const ai = new GoogleGenAI({ apiKey: currentSettings.apiKey })
       const priceMode = currentSettings.priceMode ?? 'ht'
+      const systemPrompt = buildSystemPrompt(priceMode)
 
-      // Construire le prompt avec contexte des messages precedents
-      let prompt = buildSystemPrompt(priceMode)
-
+      // Historique conversationnel injecté dans le prompt système
+      let extendedSystem = systemPrompt
       if (history.length > 0) {
         const recentHistory = history.slice(-10)
         const contextLines = recentHistory.map(m =>
           m.role === 'user' ? `Utilisateur : ${m.content}` : `Assistant : ${m.content}`
         )
-        prompt += `\n\n## Historique de la conversation :\n${contextLines.join('\n')}`
+        extendedSystem += `\n\n## Historique de la conversation :\n${contextLines.join('\n')}`
       }
 
-      prompt += `\n\nNouveau message :\n${text}`
-
-      const response = await generateWithRetry(ai, {
-        model: currentSettings.model,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: buildInvoiceSchema(priceMode),
-        },
-      })
+      let rawJson: string
+      if (provider === 'openai') {
+        rawJson = await callOpenAI(currentSettings.apiKey, currentSettings.model, extendedSystem, text, priceMode)
+      } else {
+        // Gemini : on garde la concaténation prompt + nouveau message comme avant
+        const prompt = `${extendedSystem}\n\nNouveau message :\n${text}`
+        rawJson = await callGemini(currentSettings.apiKey, currentSettings.model, prompt, priceMode)
+      }
 
       let raw: Record<string, unknown>
       try {
-        raw = JSON.parse(response.text ?? '{}')
+        raw = JSON.parse(rawJson)
       } catch {
         return { data: null, message: null, error: 'Réponse IA invalide. Réessayez.', isRetryable: true }
       }
@@ -355,7 +480,7 @@ export function useAIParser() {
 
       return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null, isRetryable: false }
     } catch (err) {
-      const errorMsg = formatError(err)
+      const errorMsg = formatError(err, provider)
       const isRetryable = err instanceof Error && /429|rate|quota|network|fetch|failed/i.test(err.message)
       return { data: null, message: null, error: errorMsg, isRetryable }
     } finally {

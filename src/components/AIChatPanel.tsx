@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Mic, MicOff, X, Sparkles, Loader2, RotateCcw, Check, Pencil, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useAIParser, validateApiKey } from '@/hooks/useAIParser'
+import { useAIParser, validateApiKey, inferProviderFromKey } from '@/hooks/useAIParser'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { storage } from '@/lib/storage'
 import type { ParsedInvoiceData } from '@/types/invoice'
@@ -334,14 +334,19 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     if (!trimmed) return
     setInlineValidating(true)
     setInlineError(null)
-    const result = await validateApiKey(trimmed)
+    const inferredProvider = inferProviderFromKey(trimmed)
+    const result = await validateApiKey(trimmed, inferredProvider)
     setInlineValidating(false)
     if (result.isValid) {
       const current = await storage.getAISettings()
+      // Si l'utilisateur change de provider, on réinitialise le modèle au défaut.
+      const previousProvider = current?.provider ?? (current?.model?.startsWith('gpt') ? 'openai' : 'google')
+      const defaultModel = inferredProvider === 'openai' ? 'gpt-4o-mini' as const : 'gemini-2.5-flash' as const
       const newSettings = {
+        provider: inferredProvider,
         apiKey: trimmed,
         apiKeyValid: true,
-        model: current?.model ?? 'gemini-2.5-flash' as const,
+        model: previousProvider === inferredProvider && current?.model ? current.model : defaultModel,
         priceMode: current?.priceMode ?? 'ht' as const,
       }
       await storage.saveAISettings(newSettings)
@@ -453,7 +458,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
               <KeyRound className="size-3.5" />
-              <p className="text-xs font-medium">Clé API Google requise</p>
+              <p className="text-xs font-medium">Clé API requise (Gemini ou OpenAI)</p>
             </div>
             <div className="relative">
               <input
@@ -461,7 +466,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
                 value={inlineKey}
                 onChange={e => { setInlineKey(e.target.value); setInlineError(null) }}
                 onKeyDown={e => { if (e.key === 'Enter') handleInlineKeySave() }}
-                placeholder="Collez votre clé API (AIza...)"
+                placeholder="AIza... (Gemini) ou sk-... (OpenAI)"
                 disabled={inlineValidating}
                 className="w-full px-2 py-1.5 pr-8 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
               />
