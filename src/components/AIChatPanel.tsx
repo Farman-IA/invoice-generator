@@ -142,6 +142,34 @@ function DataPreview({ data, onApply, onCancel }: {
         />
       )}
 
+      {/* Bon de commande / Code service Chorus Pro (administration publique) */}
+      {(draft.purchaseOrder !== undefined || draft.codeService !== undefined) && (
+        <div className="grid grid-cols-2 gap-1">
+          {draft.purchaseOrder !== undefined && (
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Bon de commande</label>
+              <input
+                value={draft.purchaseOrder ?? ''}
+                onChange={e => updateField('purchaseOrder', e.target.value)}
+                className="w-full px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
+                placeholder="N° de bon de commande"
+              />
+            </div>
+          )}
+          {draft.codeService !== undefined && (
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Code service Chorus</label>
+              <input
+                value={draft.codeService ?? ''}
+                onChange={e => updateField('codeService', e.target.value)}
+                className="w-full px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
+                placeholder="Code service"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Articles */}
       {draft.items?.length > 0 && (
         <div className="space-y-1">
