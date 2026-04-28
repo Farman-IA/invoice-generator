@@ -96,9 +96,16 @@ function buildOpenAIInvoiceSchema(priceMode: PriceMode) {
 
 function buildSystemPrompt(priceMode: PriceMode): string {
   const priceInstruction = priceMode === 'ttc'
-    ? `IMPORTANT : Les montants donnés par l'utilisateur sont en TTC (toutes taxes comprises).
-Tu dois quand même les mettre TELS QUELS dans unitPrice. La conversion TTC→HT sera faite automatiquement après.`
-    : `Les montants donnés par l'utilisateur sont en HT (hors taxe). Mets-les directement dans unitPrice.`
+    ? `Le mode global est TTC : par défaut, considère que les montants donnés sont TTC et mets-les TELS QUELS dans unitPrice (la conversion TTC→HT est faite automatiquement après).
+
+EXCEPTION — si l'utilisateur écrit EXPLICITEMENT "ht" ou "hors taxe" juste à côté d'un montant, ce montant est en HT. Tu dois alors le RECONVERTIR EN TTC avant de le mettre dans unitPrice, en multipliant par (1 + vatRate/100) :
+- "30 ht à 10%" → unitPrice = 30 × 1,10 = 33  (le code reconvertira en 30 HT au final)
+- "100 ht à 20%" → unitPrice = 100 × 1,20 = 120  (sera reconverti en 100 HT)`
+    : `Le mode global est HT : par défaut, mets les montants TELS QUELS dans unitPrice.
+
+EXCEPTION — si l'utilisateur écrit EXPLICITEMENT "ttc" ou "toutes taxes" juste à côté d'un montant, ce montant est en TTC. Tu dois alors le CONVERTIR EN HT avant de le mettre dans unitPrice, en divisant par (1 + vatRate/100) :
+- "33 ttc à 10%" → unitPrice = 33 / 1,10 = 30
+- "120 ttc à 20%" → unitPrice = 120 / 1,20 = 100`
 
   return `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
@@ -145,9 +152,27 @@ Exemples de questions → répondre avec message :
 - L'acompte est un montant en euros à DÉDUIRE du total TTC. Ce n'est PAS un article/ligne de facture.
 - Ne mets JAMAIS l'acompte dans les items ou dans les notes — utilise UNIQUEMENT le champ "deposit"
 
-## Règles de formatage :
-- Si un montant global est donné sans prix unitaire, mets quantity: 1 et unitPrice: le montant.
-- Les prix sont des nombres décimaux (30.00, pas "30 euros").
+## Règles de formatage et calcul du prix unitaire :
+- unitPrice est TOUJOURS le prix UNITAIRE (par article), JAMAIS un total agrégé
+- Si l'utilisateur emploie le mot "total", "pour" ou "au total" devant un montant ET qu'il y a une quantité > 1, ce montant est le TOTAL de la ligne : divise par la quantité pour obtenir unitPrice
+- Si l'utilisateur dit "à X€", "à X€ chacun", "à X€ par personne", "à l'unité X€", X est déjà le prix unitaire
+- Si un montant global est donné sans quantité, mets quantity: 1 et unitPrice: le montant
+- Les prix sont des nombres décimaux (30.00, pas "30 euros")
+
+EXEMPLES de calcul du prix unitaire :
+- "5 repas total 154,82€" → quantity: 5, unitPrice: 30.964 (= 154,82 / 5)
+- "10 sandwichs pour 80€" → quantity: 10, unitPrice: 8 (= 80 / 10)
+- "5 repas à 30€" → quantity: 5, unitPrice: 30 (déjà unitaire, pas de division)
+- "Location de salle 500€" → quantity: 1, unitPrice: 500
+- "5 repas total 154,82 ht à 10% et 81,67 ht à 20%" en mode TTC →
+  Ligne 1 (5 repas, total HT 154,82, TVA 10%) :
+    prix HT unitaire = 154,82 / 5 = 30,964
+    Comme mode global TTC + "ht" explicite : unitPrice = 30,964 × 1,10 = 34,0604
+    quantity: 5, unitPrice: 34.0604, vatRate: 10
+  Ligne 2 (montant 81,67 sans quantité, en HT, TVA 20%) :
+    Comme mode global TTC + "ht" explicite : unitPrice = 81,67 × 1,20 = 98,004
+    description: "Prestation TVA 20%" (générique, à éditer par l'utilisateur)
+    quantity: 1, unitPrice: 98.004, vatRate: 20
 
 ## Clients récurrents et leurs spécificités :
 
