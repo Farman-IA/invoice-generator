@@ -23,13 +23,17 @@ import { useClients } from "@/hooks/useClients";
 import { useInvoice } from "@/hooks/useInvoice";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useTheme } from "@/hooks/useTheme";
+import {
+  buildItemsFromAI,
+  buildMetaUpdateFromAI,
+  mergeClientFromAI,
+} from "@/lib/applyAIData";
 import { generatePDF } from "@/lib/pdf";
 import { storage } from "@/lib/storage";
 import type {
   AppView,
   ArticleTemplate,
   ClientInfo,
-  InvoiceData,
   LineItem,
   ParsedInvoiceData,
   VatRate,
@@ -253,116 +257,29 @@ function App() {
   const handleApplyAIData = useCallback(
     (data: ParsedInvoiceData) => {
       const isNewInvoice = view !== "EDIT";
-      const hasClient = data.clientName && data.clientName.trim() !== "";
+      const hasClient = !!(data.clientName && data.clientName.trim() !== "");
       const hasItems = data.items?.length > 0;
 
       const applyData = () => {
-        // Client : fusionner au lieu de remplacer
-        if (hasClient) {
-          const matches = findByName(data.clientName);
-          if (matches.length > 0) {
-            const match = matches[0];
-            // L'IA peut enrichir un client existant : ses donnees non vides gagnent sur celles du carnet
-            inv.updateClient({
-              companyName: match.companyName,
-              department: data.clientDepartment || match.department,
-              contactName: data.contactName || match.contactName,
-              address: data.clientAddress || match.address,
-              addressLine2: data.clientAddressLine2 || match.addressLine2,
-              postalCode: data.clientPostalCode || match.postalCode,
-              city: data.clientCity || match.city,
-              siren: match.siren,
-              tvaNumber: match.tvaNumber,
-              codeService: data.codeService || match.codeService,
-            });
-          } else if (isNewInvoice) {
-            // Nouvelle facture : remplir tout
-            inv.updateClient({
-              companyName: data.clientName,
-              department: data.clientDepartment ?? "",
-              contactName: data.contactName ?? "",
-              address: data.clientAddress ?? "",
-              addressLine2: data.clientAddressLine2 ?? "",
-              postalCode: data.clientPostalCode ?? "",
-              city: data.clientCity ?? "",
-              siren: "",
-              tvaNumber: "",
-              codeService: data.codeService ?? "",
-            });
-          } else {
-            // Modification : ne toucher QUE les champs fournis par l'IA
-            const clientUpdate: Partial<ClientInfo> = {
-              companyName: data.clientName,
-            };
-            if (data.clientDepartment)
-              clientUpdate.department = data.clientDepartment;
-            if (data.contactName) clientUpdate.contactName = data.contactName;
-            if (data.clientAddress) clientUpdate.address = data.clientAddress;
-            if (data.clientAddressLine2)
-              clientUpdate.addressLine2 = data.clientAddressLine2;
-            if (data.clientPostalCode)
-              clientUpdate.postalCode = data.clientPostalCode;
-            if (data.clientCity) clientUpdate.city = data.clientCity;
-            if (data.codeService) clientUpdate.codeService = data.codeService;
-            inv.updateClient(clientUpdate);
-          }
-        } else if (data.codeService) {
-          // Pas de nouveau client mais l'IA a fourni un code service → l'appliquer au client courant
-          inv.updateClient({ codeService: data.codeService });
-        }
+        const clientUpdate = mergeClientFromAI(data, isNewInvoice, findByName);
+        if (clientUpdate) inv.updateClient(clientUpdate);
 
-        // Articles
         if (hasItems) {
-          const profilePriceMode = inv.state.issuer.priceMode ?? "ht";
-          const newItems = data.items.map((item) => {
-            // Normaliser selon le mode du profil
-            const base = {
-              id: crypto.randomUUID(),
-              description: item.description,
-              unit: "unité",
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              vatRate: item.vatRate,
-            };
-            if (profilePriceMode === "ttc") {
-              // Si l'IA a deja fourni un TTC, l'utiliser. Sinon, le deriver du HT.
-              const unitPriceTTC =
-                item.unitPriceTTC != null
-                  ? item.unitPriceTTC
-                  : Math.round(
-                      item.unitPrice * (1 + item.vatRate / 100) * 100,
-                    ) / 100;
-              return { ...base, unitPriceTTC };
-            }
-            // Mode HT : pas de unitPriceTTC
-            return base;
-          });
-
-          if (isNewInvoice || !hasClient) {
-            // Nouvelle facture OU modification d'articles seuls → remplacer si nouvelle, ajouter si modification
-            if (isNewInvoice) {
-              inv.updateInvoice({ items: newItems });
-            } else {
-              // Modification : ajouter les nouveaux articles aux existants
-              inv.updateInvoice({
-                items: [...inv.state.invoice.items, ...newItems],
-              });
-            }
+          const priceMode = inv.state.issuer.priceMode ?? "ht";
+          const newItems = buildItemsFromAI(data, priceMode);
+          // En modification d'articles seuls : on ajoute aux existants.
+          // Sinon (nouvelle facture, OU client+articles fournis ensemble) : on remplace.
+          if (!isNewInvoice && !hasClient) {
+            inv.updateInvoice({
+              items: [...inv.state.invoice.items, ...newItems],
+            });
           } else {
-            // L'IA a fourni client ET articles → c'est une description complete, remplacer
             inv.updateInvoice({ items: newItems });
           }
         }
 
-        // Métadonnées et acompte
-        const metaUpdate: Partial<InvoiceData> = {};
-        if (data.purchaseOrder) metaUpdate.purchaseOrder = data.purchaseOrder;
-        if (data.notes) metaUpdate.notes = data.notes;
-        if (data.deposit != null && data.deposit > 0)
-          metaUpdate.deposit = data.deposit;
-        if (Object.keys(metaUpdate).length > 0) {
-          inv.updateInvoice(metaUpdate);
-        }
+        const metaUpdate = buildMetaUpdateFromAI(data);
+        if (Object.keys(metaUpdate).length > 0) inv.updateInvoice(metaUpdate);
 
         toast.success("Facture mise à jour par l'IA");
       };
