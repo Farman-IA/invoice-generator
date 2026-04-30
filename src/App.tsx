@@ -133,7 +133,13 @@ function App() {
   };
 
   const handleFinalize = async () => {
-    await inv.finalizeInvoice();
+    const ok = await inv.finalizeInvoice();
+    if (!ok) return;
+    const clientName = inv.state.client.companyName.trim();
+    if (clientName && !existsByName(clientName)) {
+      await addClient({ ...inv.state.client });
+      toast.success("Client ajouté au carnet");
+    }
   };
 
   const handleGalleryDownload = (id: string) => {
