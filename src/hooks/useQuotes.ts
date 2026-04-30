@@ -75,21 +75,19 @@ export function useQuotes() {
     load()
   }, [])
 
-  // Synchroniser le profil émetteur avec storage quand il change ailleurs
+  // Synchroniser le profil émetteur quand useInvoice (la source de vérité) le persiste.
+  // Remplace l'ancien polling 1s — voir useInvoice.ts pour l'émetteur de l'évènement.
   useEffect(() => {
-    const interval = setInterval(() => {
-      storage.getIssuerProfile().then(issuer => {
-        if (issuer) {
-          setState(prev => {
-            if (JSON.stringify(prev.issuer) !== JSON.stringify(issuer)) {
-              return { ...prev, issuer }
-            }
-            return prev
-          })
-        }
+    function handleIssuerUpdated(e: Event) {
+      const issuer = (e as CustomEvent<IssuerProfile>).detail
+      if (!issuer) return
+      setState(prev => {
+        if (JSON.stringify(prev.issuer) === JSON.stringify(issuer)) return prev
+        return { ...prev, issuer }
       })
-    }, 1000)
-    return () => clearInterval(interval)
+    }
+    window.addEventListener('issuer:updated', handleIssuerUpdated)
+    return () => window.removeEventListener('issuer:updated', handleIssuerUpdated)
   }, [])
 
   const autoSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)

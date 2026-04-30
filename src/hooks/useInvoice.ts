@@ -150,13 +150,15 @@ export function useInvoice() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce auto-save : currentInvoiceId et upsertAndPersist lus via refs
   }, [state.client, state.invoice, isLoading])
 
-  // Persister le profil émetteur à chaque modification (debounced)
+  // Persister le profil émetteur à chaque modification (debounced) et
+  // notifier les autres hooks via un évènement custom (évite le polling)
   const issuerSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (isLoading) return
     if (issuerSaveTimeout.current) clearTimeout(issuerSaveTimeout.current)
-    issuerSaveTimeout.current = setTimeout(() => {
-      storage.saveIssuerProfile(state.issuer)
+    issuerSaveTimeout.current = setTimeout(async () => {
+      await storage.saveIssuerProfile(state.issuer)
+      window.dispatchEvent(new CustomEvent<IssuerProfile>('issuer:updated', { detail: state.issuer }))
     }, 500)
     return () => {
       if (issuerSaveTimeout.current) clearTimeout(issuerSaveTimeout.current)
