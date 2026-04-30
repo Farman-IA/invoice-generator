@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Mic, MicOff, X, Sparkles, Loader2, RotateCcw, Check, Pencil, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { Send, Mic, MicOff, X, Sparkles, Loader2, RotateCcw, Check, Pencil, Eye, EyeOff, KeyRound, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useAIParser, validateApiKey, inferProviderFromKey } from '@/hooks/useAIParser'
+import { useAIParser, validateApiKey, inferProviderFromKey, type AIParseResult } from '@/hooks/useAIParser'
+import { useAIFileParser } from '@/hooks/useAIFileParser'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { ACCEPTED_EXTENSIONS } from '@/lib/fileToAIInput'
 import { storage } from '@/lib/storage'
 import type { ParsedInvoiceData } from '@/types/invoice'
 
@@ -220,8 +222,11 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [retryCountdown, setRetryCountdown] = useState(0)
   const retryAttemptRef = useRef(0)
-  const { parse, isLoading, settings, updateSettings } = useAIParser()
+  const { parse, isLoading: isLoadingText, settings, updateSettings } = useAIParser()
+  const { parseFile, isLoading: isLoadingFile } = useAIFileParser()
+  const isLoading = isLoadingText || isLoadingFile
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastUserTextRef = useRef('')
 
@@ -278,6 +283,33 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     ))
   }
 
+  // Affiche le résultat de l'IA dans le chat — partagé entre l'envoi texte et l'envoi fichier.
+  // enableRetry : si true, déclenche le countdown de réessai automatique pour les erreurs réseau.
+  // Pour le fichier on le laisse à false : l'utilisateur doit re-cliquer sur le trombone.
+  const displayParseResult = (result: AIParseResult, { enableRetry }: { enableRetry: boolean }) => {
+    if (result.data) {
+      retryAttemptRef.current = 0
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: formatAppliedData(result.data!),
+        pendingData: result.data!,
+      }])
+    } else if (result.message) {
+      retryAttemptRef.current = 0
+      addMessage({ role: 'assistant', content: result.message })
+    } else if (result.error) {
+      const isRetryable = enableRetry && !!result.isRetryable
+      addMessage({ role: 'error', content: result.error, isRetryable })
+      if (isRetryable) {
+        retryAttemptRef.current += 1
+        // Délai croissant : 15s → 30s → 60s → 60s...
+        const delay = Math.min(60, 15 * Math.pow(2, retryAttemptRef.current - 1))
+        setRetryCountdown(delay)
+      }
+    }
+  }
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return
 
@@ -294,33 +326,30 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
       .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
     const result = await parse(text, history)
-
-    if (result.data) {
-      retryAttemptRef.current = 0
-      // Afficher en mode prévisualisation — pas d'application immédiate
-      const msgId = crypto.randomUUID()
-      setMessages(prev => [...prev, {
-        id: msgId,
-        role: 'assistant',
-        content: formatAppliedData(result.data!),
-        pendingData: result.data!,
-      }])
-    } else if (result.message) {
-      retryAttemptRef.current = 0
-      addMessage({ role: 'assistant', content: result.message })
-    } else if (result.error) {
-      addMessage({ role: 'error', content: result.error, isRetryable: result.isRetryable })
-      if (result.isRetryable) {
-        retryAttemptRef.current += 1
-        // Délai croissant : 15s → 30s → 60s → 60s...
-        const delay = Math.min(60, 15 * Math.pow(2, retryAttemptRef.current - 1))
-        setRetryCountdown(delay)
-      }
-    }
+    displayParseResult(result, { enableRetry: true })
   }
 
   const handleSubmit = () => {
     sendMessage(input.trim())
+  }
+
+  // Handler quand l'utilisateur choisit un fichier (PDF ou image)
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    // Reset l'input tout de suite pour permettre de ré-uploader le même fichier après
+    event.target.value = ''
+    if (!file || isLoading) return
+
+    // Affiche un message "utilisateur" décoratif avec le nom du fichier
+    addMessage({ role: 'user', content: `📎 ${file.name}` })
+
+    const result = await parseFile(file)
+    displayParseResult(result, { enableRetry: false })
+  }
+
+  const triggerFilePicker = () => {
+    if (isLoading) return
+    fileInputRef.current?.click()
   }
 
   const handleRetry = () => {
@@ -522,6 +551,15 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
           </div>
         ) : (
           <div className="flex items-end gap-2">
+            {/* Input fichier caché — déclenché par le bouton trombone */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              onChange={handleFileSelected}
+              className="hidden"
+              aria-hidden="true"
+            />
             <textarea
               ref={inputRef}
               value={input}
@@ -533,6 +571,16 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
               className="flex-1 resize-none px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 overflow-y-auto"
               style={{ maxHeight: 160 }}
             />
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={triggerFilePicker}
+              disabled={isLoading}
+              aria-label="Joindre un fichier (PDF ou image)"
+              title="Joindre un fichier (PDF ou image)"
+            >
+              <Paperclip className="size-4" />
+            </Button>
             {speech.isSupported && (
               <Button
                 variant={speech.isListening ? 'default' : 'outline'}

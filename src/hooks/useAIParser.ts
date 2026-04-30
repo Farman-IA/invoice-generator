@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { storage } from '@/lib/storage'
 import type { AISettings, AIProvider, AIModel, ParsedInvoiceData, VatRate, PriceMode } from '@/types/invoice'
 
-function getProvider(settings: Pick<AISettings, 'provider' | 'model'>): AIProvider {
+export function getProvider(settings: Pick<AISettings, 'provider' | 'model'>): AIProvider {
   if (settings.provider) return settings.provider
   return settings.model.startsWith('gpt') ? 'openai' : 'google'
 }
@@ -51,7 +51,7 @@ function itemFields(priceMode: PriceMode): Record<string, FieldSpec> {
 
 const ITEM_REQUIRED = ['description', 'quantity', 'unitPrice', 'vatRate']
 
-function buildInvoiceSchema(priceMode: PriceMode) {
+export function buildInvoiceSchema(priceMode: PriceMode) {
   const geminiType = (k: FieldKind) => k === 'string' ? Type.STRING : Type.NUMBER
   const toProps = (fields: Record<string, FieldSpec>) =>
     Object.fromEntries(
@@ -75,7 +75,7 @@ function buildInvoiceSchema(priceMode: PriceMode) {
   }
 }
 
-function buildOpenAIInvoiceSchema(priceMode: PriceMode) {
+export function buildOpenAIInvoiceSchema(priceMode: PriceMode) {
   // OpenAI strict mode : tous les champs doivent etre dans 'required',
   // et les champs optionnels sont exprimes via une union avec null.
   const nullable = (k: FieldKind) => [k, 'null'] as const
@@ -151,7 +151,7 @@ function renderRecurringClients(): string {
   return RECURRING_CLIENTS.map(c => `### ${c.name}\n${c.rules}`).join('\n\n')
 }
 
-function buildSystemPrompt(priceMode: PriceMode): string {
+export function buildSystemPrompt(priceMode: PriceMode): string {
   const priceInstruction = priceMode === 'ttc'
     ? `Le mode global est TTC : par défaut, considère que les montants donnés sont TTC et mets-les TELS QUELS dans unitPrice (la conversion TTC→HT est faite automatiquement après).
 
@@ -268,7 +268,7 @@ function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
   return priceTtc / (1 + vatRate / 100)
 }
 
-function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {
+export function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {
   const hasClient = raw.clientName && String(raw.clientName).trim() !== ''
   const hasItems = Array.isArray(raw.items) && raw.items.length > 0
   const hasDeposit = typeof raw.deposit === 'number' && raw.deposit > 0
@@ -317,7 +317,7 @@ function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode):
 // Retry automatique sur 503 (serveurs surchargés) :
 // jusqu'à 2 nouvelles tentatives (attente 2s puis 4s). Le timeout
 // de 30s s'applique PAR tentative, pas au total.
-async function callWithRetry<T>(
+export async function callWithRetry<T>(
   fn: () => Promise<T>,
   providerLabel: string,
   maxRetries = 2,
@@ -379,7 +379,7 @@ async function callOpenAI(apiKey: string, model: AIModel, systemPrompt: string, 
   return response.choices[0]?.message?.content ?? '{}'
 }
 
-function formatError(err: unknown, provider: AIProvider): string {
+export function formatError(err: unknown, provider: AIProvider): string {
   if (!(err instanceof Error)) return 'Erreur inattendue. Réessayez.'
   const msg = err.message.toLowerCase()
   const isGoogle = provider === 'google'
