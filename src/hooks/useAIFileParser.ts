@@ -7,15 +7,10 @@ import { useState, useCallback } from 'react'
 import { GoogleGenAI } from '@google/genai'
 import OpenAI from 'openai'
 import { storage } from '@/lib/storage'
-import {
-  getProvider,
-  buildSystemPrompt,
-  buildInvoiceSchema,
-  buildOpenAIInvoiceSchema,
-  validateParsedData,
-  formatError,
-  callWithRetry,
-} from '@/hooks/useAIParser'
+import { getProvider, callWithRetry, formatError } from '@/lib/aiClient'
+import { buildInvoiceSchema, buildOpenAIInvoiceSchema } from '@/lib/aiSchemas'
+import { buildSystemPrompt } from '@/lib/aiPrompt'
+import { validateParsedData } from '@/lib/aiValidation'
 import {
   validateFile,
   extractPdfText,

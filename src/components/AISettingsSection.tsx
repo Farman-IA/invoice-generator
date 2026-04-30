@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { storage } from '@/lib/storage'
-import { validateApiKey } from '@/hooks/useAIParser'
+import { validateApiKey } from '@/lib/aiKeyValidation'
 import type { AISettings, AIProvider, AIModel, PriceMode } from '@/types/invoice'
 
 interface AISettingsSectionProps {
