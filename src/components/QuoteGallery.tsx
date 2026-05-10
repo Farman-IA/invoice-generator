@@ -102,7 +102,7 @@ export function QuoteGallery({
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {sorted.map(quote => {
-            const totals = calculateTotals(quote.quote.items)
+            const totals = calculateTotals(quote.quote.items, { discount: quote.quote.discount, discountType: quote.quote.discountType })
             const date = new Date(quote.quote.issueDate).toLocaleDateString('fr-FR')
             const isBrouillon = quote.status === 'brouillon'
             const isAccepted = quote.status === 'accepté'

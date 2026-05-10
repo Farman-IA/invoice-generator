@@ -26,7 +26,7 @@ export function Dashboard({
     const d = new Date(inv.invoice.issueDate)
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear
   })
-  const caMonth = finalizedThisMonth.reduce((sum, inv) => sum + calculateTotals(inv.invoice.items).totalTTC, 0)
+  const caMonth = finalizedThisMonth.reduce((sum, inv) => sum + calculateTotals(inv.invoice.items, { discount: inv.invoice.discount, discountType: inv.invoice.discountType }).totalTTC, 0)
 
   const drafts = invoices.filter(inv => inv.status === 'brouillon').length
   const sentQuotes = quotes.filter(q => q.status === 'envoyé').length
@@ -66,7 +66,7 @@ export function Dashboard({
           ) : (
             <div className="divide-y divide-gray-50 dark:divide-gray-800">
               {latestInvoices.map(inv => {
-                const ttc = calculateTotals(inv.invoice.items).totalTTC
+                const ttc = calculateTotals(inv.invoice.items, { discount: inv.invoice.discount, discountType: inv.invoice.discountType }).totalTTC
                 return (
                   <button key={inv.id} onClick={() => onEditInvoice(inv.id)}
                     className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -101,7 +101,7 @@ export function Dashboard({
           ) : (
             <div className="divide-y divide-gray-50 dark:divide-gray-800">
               {latestQuotes.map(q => {
-                const ttc = calculateTotals(q.quote.items).totalTTC
+                const ttc = calculateTotals(q.quote.items, { discount: q.quote.discount, discountType: q.quote.discountType }).totalTTC
                 return (
                   <button key={q.id} onClick={() => onEditQuote(q.id)}
                     className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">

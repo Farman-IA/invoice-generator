@@ -53,7 +53,7 @@ export function InvoiceGallery({
       filtered = filtered.filter(inv =>
         inv.invoice.number.toLowerCase().includes(q) ||
         inv.client.companyName.toLowerCase().includes(q) ||
-        formatEuro(calculateTotals(inv.invoice.items).totalTTC).includes(q)
+        formatEuro(calculateTotals(inv.invoice.items, { discount: inv.invoice.discount, discountType: inv.invoice.discountType }).totalTTC).includes(q)
       )
     }
 
@@ -69,8 +69,8 @@ export function InvoiceGallery({
       switch (sortKey) {
         case 'date': return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         case 'date_asc': return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-        case 'montant': return calculateTotals(b.invoice.items).totalTTC - calculateTotals(a.invoice.items).totalTTC
-        case 'montant_asc': return calculateTotals(a.invoice.items).totalTTC - calculateTotals(b.invoice.items).totalTTC
+        case 'montant': return calculateTotals(b.invoice.items, { discount: b.invoice.discount, discountType: b.invoice.discountType }).totalTTC - calculateTotals(a.invoice.items, { discount: a.invoice.discount, discountType: a.invoice.discountType }).totalTTC
+        case 'montant_asc': return calculateTotals(a.invoice.items, { discount: a.invoice.discount, discountType: a.invoice.discountType }).totalTTC - calculateTotals(b.invoice.items, { discount: b.invoice.discount, discountType: b.invoice.discountType }).totalTTC
         case 'client': return a.client.companyName.localeCompare(b.client.companyName)
         default: return 0
       }
@@ -170,7 +170,7 @@ export function InvoiceGallery({
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {sorted.map(invoice => {
-            const totals = calculateTotals(invoice.invoice.items)
+            const totals = calculateTotals(invoice.invoice.items, { discount: invoice.invoice.discount, discountType: invoice.invoice.discountType })
             const date = new Date(invoice.invoice.issueDate).toLocaleDateString('fr-FR')
             const isBrouillon = invoice.status === 'brouillon'
 
