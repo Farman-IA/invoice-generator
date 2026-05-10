@@ -26,6 +26,18 @@ function normalizeSavedInvoice(inv: SavedInvoice): SavedInvoice {
   return { ...inv, client: normalizeClientInfo(inv.client) }
 }
 
+// Vrai dès qu'un champ "vivant" est rempli — déclenche l'autosave plus tôt
+// que l'ancienne condition (qui exigeait `client.companyName` non vide et faisait
+// perdre les lignes tapées avant le client). Cf. incident DEV-2026-007 du 10/05/2026.
+function hasInvoiceContent(state: InvoiceState): boolean {
+  if (state.client.companyName.trim()) return true
+  if (state.client.contactName.trim()) return true
+  if (state.invoice.notes.trim()) return true
+  if (state.invoice.purchaseOrder.trim()) return true
+  if (state.invoice.items.some(i => i.description.trim() || i.unitPrice > 0 || (i.unitPriceTTC ?? 0) > 0)) return true
+  return false
+}
+
 // Date locale (évite le décalage UTC qui peut fausser les comparaisons de retard)
 function getLocalDate(): string {
   return new Date().toLocaleDateString('sv-SE') // format YYYY-MM-DD
@@ -131,19 +143,22 @@ export function useInvoice() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
-  // Sauvegarde automatique de la facture en cours (debounced 2s)
+  // Sauvegarde automatique de la facture en cours (debouncé 500ms).
+  // Conditions d'éligibilité :
+  // - Pas en chargement initial
+  // - Au moins un champ "vivant" rempli (cf. hasInvoiceContent) — change post-incident
+  //   du 10/05/2026 où des lignes étaient perdues car saisies avant le nom du client
+  // - Si la facture existe déjà avec status 'finalisée', on ne réécrase pas
   const autoSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (isLoading) return
-    // Ne pas auto-sauvegarder si le client est vide (facture vierge)
-    if (!state.client.companyName.trim()) return
-    // Ne pas auto-sauvegarder si déjà finalisée
+    if (!hasInvoiceContent(state)) return
     if (currentInvoiceId && savedInvoices.find(i => i.id === currentInvoiceId)?.status === 'finalisée') return
 
     if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     autoSaveTimeout.current = setTimeout(() => {
       upsertAndPersist('brouillon')
-    }, 2000)
+    }, 500)
     return () => {
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     }
@@ -165,41 +180,51 @@ export function useInvoice() {
     }
   }, [state.issuer, isLoading])
 
-  // Sauvegarder le profil émetteur et la facture en cours avant de fermer l'onglet
+  // Sauvegarde de secours synchrone à la fermeture / changement d'onglet.
+  // Utilise localStorage.setItem direct (saveInvoicesSync) car l'API async classique
+  // peut être interrompue par la fermeture de l'onglet (cause possible du bug
+  // "DEV-2026-007 a perdu ses lignes" du 10/05/2026 — appliqué aussi côté factures
+  // pour cohérence, même schéma).
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const flushSync = () => {
+      // Issuer profile : on garde l'API async ici, le timeout est court (500ms)
+      // et l'issuer change beaucoup moins souvent que les lignes
       if (issuerSaveTimeout.current) {
         clearTimeout(issuerSaveTimeout.current)
         storage.saveIssuerProfile(stateRef.current.issuer)
       }
-      // Sauvegarder la facture en cours si elle a du contenu
-      if (autoSaveTimeout.current) {
-        clearTimeout(autoSaveTimeout.current)
-      }
-      if (stateRef.current.client.companyName.trim()) {
-        const now = new Date().toISOString()
-        const current = stateRef.current
-        const invoiceId = currentInvoiceIdRef.current
-        let updated: SavedInvoice[]
-        if (invoiceId) {
-          updated = savedInvoicesRef.current.map(inv =>
-            inv.id === invoiceId
-              ? { ...inv, issuer: current.issuer, client: current.client, invoice: current.invoice, updatedAt: now }
-              : inv
-          )
-        } else {
-          const newInvoice: SavedInvoice = {
-            id: crypto.randomUUID(), issuer: current.issuer, client: current.client,
-            invoice: current.invoice, status: 'brouillon', createdAt: now, updatedAt: now,
-          }
-          updated = [newInvoice, ...savedInvoicesRef.current]
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+      if (!hasInvoiceContent(stateRef.current)) return
+
+      const now = new Date().toISOString()
+      const current = stateRef.current
+      const invoiceId = currentInvoiceIdRef.current
+      let updated: SavedInvoice[]
+      if (invoiceId) {
+        updated = savedInvoicesRef.current.map(inv =>
+          inv.id === invoiceId
+            ? { ...inv, issuer: current.issuer, client: current.client, invoice: current.invoice, updatedAt: now }
+            : inv
+        )
+      } else {
+        const newInvoice: SavedInvoice = {
+          id: crypto.randomUUID(), issuer: current.issuer, client: current.client,
+          invoice: current.invoice, status: 'brouillon', createdAt: now, updatedAt: now,
         }
-        storage.saveInvoices(updated)
-        storage.saveCounter(current.counter)
+        updated = [newInvoice, ...savedInvoicesRef.current]
       }
+      storage.saveInvoicesSync(updated)
+      storage.saveCounterSync(current.counter)
     }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushSync()
+    }
+    window.addEventListener('beforeunload', flushSync)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('beforeunload', flushSync)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
 

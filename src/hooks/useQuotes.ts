@@ -24,6 +24,18 @@ function normalizeSavedQuote(qt: SavedQuote): SavedQuote {
   return { ...qt, client: normalizeClientInfo(qt.client) }
 }
 
+// Vrai dès qu'un champ "vivant" est rempli — déclenche l'autosave plus tôt
+// que l'ancienne condition (qui exigeait `client.companyName` non vide et faisait
+// perdre les lignes tapées avant le client).
+function hasQuoteContent(state: QuoteState): boolean {
+  if (state.client.companyName.trim()) return true
+  if (state.client.contactName.trim()) return true
+  if (state.quote.notes.trim()) return true
+  if (state.quote.purchaseOrder.trim()) return true
+  if (state.quote.items.some(i => i.description.trim() || i.unitPrice > 0 || (i.unitPriceTTC ?? 0) > 0)) return true
+  return false
+}
+
 interface QuoteState {
   issuer: IssuerProfile
   client: ClientInfo
@@ -177,51 +189,73 @@ export function useQuotes() {
     await storage.saveQuoteCounter(current.counter)
   }, [])
 
-  // Auto-save debounced (2s) pour les devis en cours d'édition
+  // Auto-save debouncé (500ms) pour les devis en cours d'édition.
+  // Conditions d'éligibilité :
+  // - Pas en chargement initial
+  // - Au moins un champ "vivant" rempli (cf. hasQuoteContent) — change post-incident
+  //   du 10/05/2026 où des lignes étaient perdues car saisies avant le nom du client
+  // - Si le devis existe déjà avec un statut autre que 'brouillon', on n'écrase pas
   useEffect(() => {
     if (isLoading) return
-    if (!state.client.companyName.trim()) return
+    if (!hasQuoteContent(state)) return
     if (currentQuoteId && savedQuotes.find(q => q.id === currentQuoteId)?.status !== 'brouillon') return
 
     if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     autoSaveTimeout.current = setTimeout(() => {
       saveQuoteInternal()
-    }, 2000)
+    }, 500)
     return () => {
       if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce auto-save : currentQuoteId et savedQuotes lus via refs
   }, [state.client, state.quote, isLoading, saveQuoteInternal])
 
-  // Sauvegarder le devis en cours avant de fermer l'onglet
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
-      if (stateRef.current.client.companyName.trim()) {
-        const now = new Date().toISOString()
-        const current = stateRef.current
-        const quoteId = currentQuoteIdRef.current
-        let updated: SavedQuote[]
-        if (quoteId) {
-          updated = savedQuotesRef.current.map(q =>
-            q.id === quoteId
-              ? { ...q, issuer: current.issuer, client: current.client, quote: current.quote, updatedAt: now }
-              : q
-          )
-        } else {
-          const newQuote: SavedQuote = {
-            id: crypto.randomUUID(), issuer: current.issuer, client: current.client,
-            quote: current.quote, status: 'brouillon', createdAt: now, updatedAt: now,
-          }
-          updated = [newQuote, ...savedQuotesRef.current]
-        }
-        storage.saveQuotes(updated)
-        storage.saveQuoteCounter(current.counter)
+  // Construit l'array SavedQuote à persister depuis l'état courant
+  // Factorisé entre beforeunload et visibilitychange pour garantir un comportement identique
+  const buildPersistedQuotes = useCallback((): { quotes: SavedQuote[]; counter: number } | null => {
+    if (!hasQuoteContent(stateRef.current)) return null
+    const now = new Date().toISOString()
+    const current = stateRef.current
+    const quoteId = currentQuoteIdRef.current
+    let quotes: SavedQuote[]
+    if (quoteId) {
+      quotes = savedQuotesRef.current.map(q =>
+        q.id === quoteId
+          ? { ...q, issuer: current.issuer, client: current.client, quote: current.quote, updatedAt: now }
+          : q
+      )
+    } else {
+      const newQuote: SavedQuote = {
+        id: crypto.randomUUID(), issuer: current.issuer, client: current.client,
+        quote: current.quote, status: 'brouillon', createdAt: now, updatedAt: now,
       }
+      quotes = [newQuote, ...savedQuotesRef.current]
     }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    return { quotes, counter: current.counter }
   }, [])
+
+  // Sauvegarde de secours synchrone à la fermeture / changement d'onglet.
+  // Utilise localStorage.setItem direct (saveQuotesSync) car l'API async classique
+  // peut être interrompue par la fermeture de l'onglet (cause possible du bug
+  // "DEV-2026-007 a perdu ses lignes" du 10/05/2026).
+  useEffect(() => {
+    const flushSync = () => {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current)
+      const payload = buildPersistedQuotes()
+      if (!payload) return
+      storage.saveQuotesSync(payload.quotes)
+      storage.saveQuoteCounterSync(payload.counter)
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushSync()
+    }
+    window.addEventListener('beforeunload', flushSync)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('beforeunload', flushSync)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [buildPersistedQuotes])
 
   // Sauvegarder le devis courant (avec toast)
   const saveQuote = useCallback(async () => {

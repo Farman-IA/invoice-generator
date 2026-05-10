@@ -50,14 +50,29 @@ async function set(key: string, value: unknown): Promise<SaveResult> {
   }
 }
 
+// Version synchrone pour beforeunload / visibilitychange : on doit garantir
+// que l'écriture aboutisse AVANT que l'onglet ne se ferme. L'API async classique
+// peut être interrompue par la fermeture (cause possible du bug "lignes perdues"
+// du 10 mai 2026 sur DEV-2026-007). localStorage.setItem est synchrone par nature.
+function setSync(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (err) {
+    // Pas de toast ici : on est dans un handler de fermeture, l'UI n'a pas le temps
+    console.error('[storage.setSync] échec pour la clé:', key, err)
+  }
+}
+
 export const storage = {
   // Factures
   getInvoices: () => get<SavedInvoice[]>(KEYS.INVOICES, []),
   saveInvoices: (invoices: SavedInvoice[]) => set(KEYS.INVOICES, invoices),
+  saveInvoicesSync: (invoices: SavedInvoice[]) => setSync(KEYS.INVOICES, invoices),
 
   // Compteur
   getCounter: () => get<number>(KEYS.INVOICE_COUNTER, 1),
   saveCounter: (counter: number) => set(KEYS.INVOICE_COUNTER, counter),
+  saveCounterSync: (counter: number) => setSync(KEYS.INVOICE_COUNTER, counter),
 
   // Profil émetteur
   async getIssuerProfile(): Promise<IssuerProfile | null> {
@@ -81,8 +96,10 @@ export const storage = {
   // Devis
   getQuotes: () => get<SavedQuote[]>(KEYS.QUOTES, []),
   saveQuotes: (quotes: SavedQuote[]) => set(KEYS.QUOTES, quotes),
+  saveQuotesSync: (quotes: SavedQuote[]) => setSync(KEYS.QUOTES, quotes),
   getQuoteCounter: () => get<number>(KEYS.QUOTE_COUNTER, 1),
   saveQuoteCounter: (counter: number) => set(KEYS.QUOTE_COUNTER, counter),
+  saveQuoteCounterSync: (counter: number) => setSync(KEYS.QUOTE_COUNTER, counter),
 
   // Thème
   getTheme: () => get<'light' | 'dark'>(KEYS.THEME, 'light'),
