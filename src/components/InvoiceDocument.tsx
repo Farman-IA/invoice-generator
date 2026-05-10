@@ -8,7 +8,6 @@ import { LineItemsTable } from '@/components/LineItemsTable'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
 import { PLACEHOLDERS, LEGAL_MENTIONS } from '@/lib/constants'
 import type { IssuerProfile, ClientInfo, InvoiceData, QuoteData, LineItem, ArticleTemplate, ClientRecord, PriceMode } from '@/types/invoice'
-import { VALIDITY_OPTIONS } from '@/lib/constants'
 
 interface BaseDocumentProps {
   issuer: IssuerProfile
@@ -339,15 +338,22 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
             <>
               <div className="flex gap-1 whitespace-nowrap items-center">
                 <span className="text-gray-400">Validité :</span>
-                <select
+                {/* Input libre 1..365 jours pour permettre une date custom (ex: 21 jours
+                    pour cibler exactement la date du repas). L'ancien <select> ne proposait
+                    que 15/30/60/90 et écrasait les valeurs custom à l'autosave. */}
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
                   value={(invoice as QuoteData).validityDays}
-                  onChange={(e) => onUpdateInvoice({ validityDays: Number(e.target.value) } as never)}
-                  className="text-xs border-none bg-transparent cursor-pointer focus:outline-none"
-                >
-                  {VALIDITY_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  onChange={(e) => {
+                    const n = Math.min(365, Math.max(1, Number(e.target.value) || 1))
+                    onUpdateInvoice({ validityDays: n } as never)
+                  }}
+                  aria-label="Nombre de jours de validité du devis"
+                  className="text-xs border-none bg-transparent w-12 focus:outline-none focus:ring-1 focus:ring-blue-200 rounded-sm"
+                />
+                <span className="text-xs text-gray-400">jours</span>
               </div>
               <div className="flex gap-1 whitespace-nowrap">
                 <span className="text-gray-400">Valable jusqu'au :</span>
