@@ -105,6 +105,21 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
     const discountType = invoice.discountType ?? 'amount'
     const totals = calculateTotals(invoice.items, { discount, discountType })
 
+    // Clamp à la saisie : en mode %, la valeur reste dans 0..100
+    // pour éviter qu'un "150%" affiché en PDF ne corresponde pas au calcul (clampé à 100% côté lib)
+    const handleDiscountChange = (raw: number) => {
+      const max = discountType === 'percent' ? 100 : Number.POSITIVE_INFINITY
+      const clamped = Math.min(max, Math.max(0, Number.isFinite(raw) ? raw : 0))
+      onUpdateInvoice({ discount: Math.round(clamped * 100) / 100 } as never)
+    }
+
+    // Reset de la remise au changement de type pour éviter qu'une valeur "20"
+    // saisie en % se retrouve interprétée comme 20€ après clic sur le toggle €
+    const handleDiscountTypeChange = (newType: 'percent' | 'amount') => {
+      if (newType === discountType) return
+      onUpdateInvoice({ discountType: newType, discount: 0 } as never)
+    }
+
     // F4 fix: validate file type and size before reading
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
@@ -395,8 +410,9 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               <span className="tabular-nums">{formatEuro(totals.totalHT)} €</span>
             </div>
 
-            {/* Ligne remise : visible seulement si une remise est appliquée */}
-            {totals.discountAmount > 0 && (
+            {/* Ligne remise : visible dès qu'une valeur est saisie (alignée avec l'input)
+                pour qu'aucune saisie ne disparaisse silencieusement du PDF */}
+            {discount > 0 && (
               <>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">
@@ -452,37 +468,46 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
         <div className="mt-4 flex flex-col items-end gap-2 no-print-pdf">
           {/* Remise : disponible pour devis ET factures */}
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Remise :</span>
+            <label htmlFor="discount-input">Remise :</label>
             <input
+              id="discount-input"
               type="number"
               min="0"
+              max={discountType === 'percent' ? 100 : undefined}
               step="0.01"
               value={discount > 0 ? discount : ''}
-              onChange={(e) => onUpdateInvoice({ discount: Math.max(0, Number(e.target.value) || 0) } as never)}
+              onChange={(e) => handleDiscountChange(Number(e.target.value))}
               placeholder="0"
+              aria-label={discountType === 'percent' ? 'Remise en pourcentage (0 à 100)' : 'Remise en euros'}
               className="w-24 rounded-sm border border-gray-200 bg-white px-2 py-1 text-right text-sm outline-none focus:ring-1 focus:ring-blue-200"
             />
-            {/* Toggle % / € : on bascule entre les deux modes de remise */}
-            <div className="inline-flex rounded-sm border border-gray-200 bg-white text-xs overflow-hidden">
+            {/* Choix exclusif € / % en pattern radiogroup pour les lecteurs d'écran */}
+            <div
+              role="radiogroup"
+              aria-label="Type de remise"
+              className="inline-flex rounded-sm border border-gray-200 bg-white text-xs overflow-hidden"
+            >
               <button
                 type="button"
-                onClick={() => onUpdateInvoice({ discountType: 'amount' } as never)}
+                role="radio"
+                aria-checked={discountType === 'amount'}
+                onClick={() => handleDiscountTypeChange('amount')}
                 className={cn(
                   'px-2 py-1 transition-colors',
                   discountType === 'amount' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50'
                 )}
-                aria-pressed={discountType === 'amount'}
               >
                 €
               </button>
               <button
                 type="button"
-                onClick={() => onUpdateInvoice({ discountType: 'percent' } as never)}
+                role="radio"
+                aria-checked={discountType === 'percent'}
+                onClick={() => handleDiscountTypeChange('percent')}
                 className={cn(
                   'px-2 py-1 transition-colors border-l border-gray-200',
                   discountType === 'percent' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50'
                 )}
-                aria-pressed={discountType === 'percent'}
               >
                 %
               </button>
@@ -492,14 +517,16 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           {/* Acompte : factures uniquement */}
           {!isQuote && (
             <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span>Acompte versé :</span>
+              <label htmlFor="deposit-input">Acompte versé :</label>
               <input
+                id="deposit-input"
                 type="number"
                 min="0"
                 step="0.01"
                 value={(invoice as InvoiceData).deposit > 0 ? (invoice as InvoiceData).deposit : ''}
                 onChange={(e) => onUpdateInvoice({ deposit: Math.max(0, Number(e.target.value) || 0) } as never)}
                 placeholder="0"
+                aria-label="Montant de l'acompte versé en euros"
                 className="w-24 rounded-sm border border-gray-200 bg-white px-2 py-1 text-right text-sm outline-none focus:ring-1 focus:ring-blue-200"
               />
               <span>€</span>
