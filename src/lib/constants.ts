@@ -114,6 +114,8 @@ export function getDefaultInvoice(counter: number): InvoiceData {
     paymentTerms: 'Virement bancaire à 30 jours',
     notes: '',
     deposit: 0,
+    discount: 0,
+    discountType: 'amount',
     items: [createDefaultLineItem()],
   }
 }
@@ -146,6 +148,8 @@ export function getDefaultQuote(counter: number): QuoteData {
     validUntil: formatDate(validUntil),
     purchaseOrder: '',
     notes: '',
+    discount: 0,
+    discountType: 'amount',
     items: [createDefaultLineItem()],
   }
 }

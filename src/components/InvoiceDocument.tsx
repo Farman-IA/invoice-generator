@@ -100,7 +100,10 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
     const mode = ('mode' in rest && rest.mode === 'quote') ? 'quote' : 'invoice'
     const isQuote = mode === 'quote'
     const logoInputRef = useRef<HTMLInputElement>(null)
-    const totals = calculateTotals(invoice.items)
+    // Remise globale appliquée sur le HT (présente sur factures ET devis)
+    const discount = invoice.discount ?? 0
+    const discountType = invoice.discountType ?? 'amount'
+    const totals = calculateTotals(invoice.items, { discount, discountType })
 
     // F4 fix: validate file type and size before reading
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -392,6 +395,22 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               <span className="tabular-nums">{formatEuro(totals.totalHT)} €</span>
             </div>
 
+            {/* Ligne remise : visible seulement si une remise est appliquée */}
+            {totals.discountAmount > 0 && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">
+                    Remise{discountType === 'percent' ? ` (${discount}%)` : ''}
+                  </span>
+                  <span className="tabular-nums">− {formatEuro(totals.discountAmount)} €</span>
+                </div>
+                <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
+                  <span className="text-gray-500">Total HT net</span>
+                  <span className="tabular-nums">{formatEuro(totals.totalHTAfterDiscount)} €</span>
+                </div>
+              </>
+            )}
+
             {totals.vatBreakdown.map((entry) => (
               <div key={entry.rate} className="flex justify-between text-xs text-gray-500">
                 <span>
@@ -429,9 +448,49 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
           </div>
         </div>
 
-        {/* Saisie acompte (factures uniquement, caché en PDF) */}
-        {!isQuote && (
-          <div className="mt-4 flex justify-end no-print-pdf">
+        {/* Saisie remise + acompte (caché en PDF) */}
+        <div className="mt-4 flex flex-col items-end gap-2 no-print-pdf">
+          {/* Remise : disponible pour devis ET factures */}
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Remise :</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={discount > 0 ? discount : ''}
+              onChange={(e) => onUpdateInvoice({ discount: Math.max(0, Number(e.target.value) || 0) } as never)}
+              placeholder="0"
+              className="w-24 rounded-sm border border-gray-200 bg-white px-2 py-1 text-right text-sm outline-none focus:ring-1 focus:ring-blue-200"
+            />
+            {/* Toggle % / € : on bascule entre les deux modes de remise */}
+            <div className="inline-flex rounded-sm border border-gray-200 bg-white text-xs overflow-hidden">
+              <button
+                type="button"
+                onClick={() => onUpdateInvoice({ discountType: 'amount' } as never)}
+                className={cn(
+                  'px-2 py-1 transition-colors',
+                  discountType === 'amount' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50'
+                )}
+                aria-pressed={discountType === 'amount'}
+              >
+                €
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateInvoice({ discountType: 'percent' } as never)}
+                className={cn(
+                  'px-2 py-1 transition-colors border-l border-gray-200',
+                  discountType === 'percent' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50'
+                )}
+                aria-pressed={discountType === 'percent'}
+              >
+                %
+              </button>
+            </div>
+          </div>
+
+          {/* Acompte : factures uniquement */}
+          {!isQuote && (
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Acompte versé :</span>
               <input
@@ -445,8 +504,8 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               />
               <span>€</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* ========== FOOTER ========== */}
         <div className="mt-12 pt-6 border-t border-gray-200 text-xs text-gray-500 space-y-4">

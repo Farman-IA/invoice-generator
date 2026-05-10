@@ -52,6 +52,9 @@ export interface ClientInfo {
   codeService: string
 }
 
+// Type de remise : pourcentage du HT, ou montant fixe en euros
+export type DiscountType = 'percent' | 'amount'
+
 export interface InvoiceData {
   number: string
   issueDate: string
@@ -61,6 +64,9 @@ export interface InvoiceData {
   paymentTerms: string
   notes: string
   deposit: number
+  // Remise commerciale appliquée sur le total HT (0 = pas de remise)
+  discount?: number
+  discountType?: DiscountType
   items: LineItem[]
 }
 
@@ -95,6 +101,9 @@ export interface QuoteData {
   validUntil: string
   purchaseOrder: string
   notes: string
+  // Remise commerciale appliquée sur le total HT (0 = pas de remise)
+  discount?: number
+  discountType?: DiscountType
   items: LineItem[]
 }
 

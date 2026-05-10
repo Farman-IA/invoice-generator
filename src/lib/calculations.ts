@@ -1,4 +1,4 @@
-import type { LineItem, VatRate } from '@/types/invoice'
+import type { LineItem, VatRate, DiscountType } from '@/types/invoice'
 
 export function calculateLineTotal(quantity: number, unitPrice: number): number {
   return Math.round(quantity * unitPrice * 100) / 100
@@ -11,10 +11,21 @@ export interface VatBreakdownEntry {
 }
 
 export interface InvoiceTotals {
+  // Total HT brut, avant remise
   totalHT: number
+  // Montant absolu de la remise en euros (0 si pas de remise)
+  discountAmount: number
+  // Total HT effectivement facturé après remise
+  totalHTAfterDiscount: number
   vatBreakdown: VatBreakdownEntry[]
   totalVAT: number
   totalTTC: number
+}
+
+// Options de remise globale appliquée sur le HT
+interface DiscountOptions {
+  discount?: number
+  discountType?: DiscountType
 }
 
 /**
@@ -26,7 +37,10 @@ export interface InvoiceTotals {
  *
  * Cela garantit que le total TTC est toujours exact quand les prix sont saisis en TTC.
  */
-export function calculateTotals(items: LineItem[]): InvoiceTotals {
+export function calculateTotals(
+  items: LineItem[],
+  discountOptions: DiscountOptions = {}
+): InvoiceTotals {
   const vatMap = new Map<VatRate, { baseHT: number; totalTTC: number }>()
 
   let totalHT = 0
@@ -65,19 +79,40 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
 
   totalHT = Math.round(totalHT * 100) / 100
 
+  // Calcul du montant de la remise (clampé pour rester dans des bornes saines)
+  const rawDiscount = discountOptions.discount ?? 0
+  const discountType = discountOptions.discountType ?? 'amount'
+  let discountAmount = 0
+  if (totalHT > 0 && rawDiscount > 0) {
+    if (discountType === 'percent') {
+      const pct = Math.min(100, Math.max(0, rawDiscount))
+      discountAmount = (totalHT * pct) / 100
+    } else {
+      discountAmount = Math.min(totalHT, Math.max(0, rawDiscount))
+    }
+    discountAmount = Math.round(discountAmount * 100) / 100
+  }
+
+  // Ratio de remise pour répartir proportionnellement sur chaque base TVA
+  const discountRatio = totalHT > 0 ? discountAmount / totalHT : 0
+  const totalHTAfterDiscount = Math.round((totalHT - discountAmount) * 100) / 100
+
   const vatBreakdown: VatBreakdownEntry[] = []
   let totalVAT = 0
 
   for (const [rate, group] of vatMap.entries()) {
-    const roundedBase = Math.round(group.baseHT * 100) / 100
+    // Base HT remisée : on applique le même ratio à chaque base TVA pour
+    // garantir que la remise soit "neutre" entre les différents taux
+    const discountedBase = group.baseHT * (1 - discountRatio)
+    const roundedBase = Math.round(discountedBase * 100) / 100
 
     let vatAmount: number
-    if (group.totalTTC > 0) {
-      // Mode TTC : TVA = TTC − HT (garanti exact)
+    if (group.totalTTC > 0 && discountRatio === 0) {
+      // Mode TTC sans remise : TVA = TTC − HT (garanti exact, méthode française)
       const roundedTTC = Math.round(group.totalTTC * 100) / 100
       vatAmount = Math.round((roundedTTC - roundedBase) * 100) / 100
     } else {
-      // Mode HT : TVA = HT × taux
+      // Mode HT (ou mode TTC + remise) : on recalcule la TVA sur la base remisée
       vatAmount = Math.round(roundedBase * (rate / 100) * 100) / 100
     }
 
@@ -87,9 +122,9 @@ export function calculateTotals(items: LineItem[]): InvoiceTotals {
 
   vatBreakdown.sort((a, b) => a.rate - b.rate)
   totalVAT = Math.round(totalVAT * 100) / 100
-  totalTTC = Math.round((totalHT + totalVAT) * 100) / 100
+  totalTTC = Math.round((totalHTAfterDiscount + totalVAT) * 100) / 100
 
-  return { totalHT, vatBreakdown, totalTTC, totalVAT }
+  return { totalHT, discountAmount, totalHTAfterDiscount, vatBreakdown, totalTTC, totalVAT }
 }
 
 export function formatEuro(amount: number): string {
