@@ -10,6 +10,7 @@ import type {
   AppView,
 } from '@/types/invoice'
 import { storage } from '@/lib/storage'
+import { subscribe } from '@/lib/storageChannel'
 import { calculateTotals } from '@/lib/calculations'
 import { normalizeLineItemPrices, mergeLineItem } from '@/lib/money'
 import {
@@ -239,6 +240,59 @@ export function useInvoice() {
     return () => {
       window.removeEventListener('beforeunload', flushSync)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  // Synchronisation multi-onglet (cf. Finding #6 de l'audit 2026-05-19).
+  // On reçoit des signaux légers — pas le payload — et on relit localStorage
+  // pour avoir l'état frais. Le handler 'invoices:updated' :
+  //  1. Recharge la liste depuis le storage
+  //  2. Applique normalizeSavedInvoice (compat retro + arrondi brouillons)
+  //  3. Détecte si la facture en cours d'édition a été supprimée par un autre
+  //     onglet → toast d'alerte + reset du formulaire pour ne pas continuer
+  //     à éditer un fantôme
+  //  4. NE TOUCHE PAS à state.invoice/client (édition en cours) — limite
+  //     connue : dernier sauve gagne sur édition simultanée de la même facture
+  useEffect(() => {
+    const handleInvoicesUpdated = async () => {
+      try {
+        const fresh = (await storage.getInvoices()).map(normalizeSavedInvoice)
+        const currentId = currentInvoiceIdRef.current
+        if (currentId && !fresh.find(inv => inv.id === currentId)) {
+          // La facture en cours d'édition a disparu (supprimée dans un autre onglet)
+          toast.warning('La facture en cours d\'édition a été supprimée dans un autre onglet')
+          setCurrentInvoiceId(null)
+          currentInvoiceIdRef.current = null
+          setIsFinalized(false)
+          setState(prev => ({
+            ...prev,
+            client: getDefaultClient(),
+            invoice: getDefaultInvoice(prev.counter),
+          }))
+        }
+        setSavedInvoices(fresh)
+        savedInvoicesRef.current = fresh
+      } catch (err) {
+        console.warn('[useInvoice] reload depuis storageChannel échoué:', err)
+      }
+    }
+
+    const handleCounterUpdated = async () => {
+      try {
+        const freshCounter = await storage.getCounter()
+        // Update conditionnel pour éviter de retrigger des effets si la valeur
+        // n'a pas réellement bougé (ex: signal redondant)
+        setState(prev => prev.counter === freshCounter ? prev : { ...prev, counter: freshCounter })
+      } catch (err) {
+        console.warn('[useInvoice] reload counter échoué:', err)
+      }
+    }
+
+    const unsubInvoices = subscribe('invoices:updated', handleInvoicesUpdated)
+    const unsubCounter = subscribe('invoice-counter:updated', handleCounterUpdated)
+    return () => {
+      unsubInvoices()
+      unsubCounter()
     }
   }, [])
 

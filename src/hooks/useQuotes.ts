@@ -9,6 +9,7 @@ import type {
   QuoteStatus,
 } from '@/types/invoice'
 import { storage } from '@/lib/storage'
+import { subscribe } from '@/lib/storageChannel'
 import { normalizeLineItemPrices, mergeLineItem } from '@/lib/money'
 import {
   getDefaultIssuer,
@@ -268,6 +269,49 @@ export function useQuotes() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [buildPersistedQuotes])
+
+  // Synchronisation multi-onglet (cf. Finding #6 de l'audit 2026-05-19).
+  // Symétrique à useInvoice : on reçoit un signal léger, on relit storage,
+  // on détecte la suppression du devis en cours d'édition.
+  useEffect(() => {
+    const handleQuotesUpdated = async () => {
+      try {
+        const fresh = (await storage.getQuotes()).map(normalizeSavedQuote)
+        const currentId = currentQuoteIdRef.current
+        if (currentId && !fresh.find(q => q.id === currentId)) {
+          toast.warning('Le devis en cours d\'édition a été supprimé dans un autre onglet')
+          setCurrentQuoteId(null)
+          currentQuoteIdRef.current = null
+          setIsLocked(false)
+          setState(prev => ({
+            ...prev,
+            client: getDefaultClient(),
+            quote: getDefaultQuote(prev.counter),
+          }))
+        }
+        setSavedQuotes(fresh)
+        savedQuotesRef.current = fresh
+      } catch (err) {
+        console.warn('[useQuotes] reload depuis storageChannel échoué:', err)
+      }
+    }
+
+    const handleCounterUpdated = async () => {
+      try {
+        const freshCounter = await storage.getQuoteCounter()
+        setState(prev => prev.counter === freshCounter ? prev : { ...prev, counter: freshCounter })
+      } catch (err) {
+        console.warn('[useQuotes] reload counter échoué:', err)
+      }
+    }
+
+    const unsubQuotes = subscribe('quotes:updated', handleQuotesUpdated)
+    const unsubCounter = subscribe('quote-counter:updated', handleCounterUpdated)
+    return () => {
+      unsubQuotes()
+      unsubCounter()
+    }
+  }, [])
 
   // Sauvegarder le devis courant (avec toast)
   const saveQuote = useCallback(async () => {

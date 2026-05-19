@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import type { SavedInvoice, SavedQuote, IssuerProfile, ClientRecord, ArticleTemplate, AISettings } from '@/types/invoice'
+import { publish, type StorageEventType } from '@/lib/storageChannel'
 
 const KEYS = {
   INVOICES: 'invoices',
@@ -30,10 +31,13 @@ async function get<T>(key: string, fallback: T): Promise<T> {
   }
 }
 
-async function set(key: string, value: unknown): Promise<SaveResult> {
+async function set(key: string, value: unknown, broadcastEvent?: StorageEventType): Promise<SaveResult> {
   try {
     const serialized = JSON.stringify(value)
     await window.storage.set(key, serialized)
+    // Sync multi-onglet : on signale aux autres onglets seulement après une
+    // écriture confirmée. Inutile (et trompeur) de notifier sur un échec.
+    if (broadcastEvent) publish(broadcastEvent)
     return { ok: true }
   } catch (err) {
     console.error('[storage.set] échec pour la clé:', key, err)
@@ -54,9 +58,12 @@ async function set(key: string, value: unknown): Promise<SaveResult> {
 // que l'écriture aboutisse AVANT que l'onglet ne se ferme. L'API async classique
 // peut être interrompue par la fermeture (cause possible du bug "lignes perdues"
 // du 10 mai 2026 sur DEV-2026-007). localStorage.setItem est synchrone par nature.
-function setSync(key: string, value: unknown): void {
+function setSync(key: string, value: unknown, broadcastEvent?: StorageEventType): void {
   try {
     localStorage.setItem(key, JSON.stringify(value))
+    // Best-effort : si l'onglet se ferme avant que postMessage parte, les
+    // autres onglets verront simplement la mise à jour au prochain reload.
+    if (broadcastEvent) publish(broadcastEvent)
   } catch (err) {
     // Pas de toast ici : on est dans un handler de fermeture, l'UI n'a pas le temps
     console.error('[storage.setSync] échec pour la clé:', key, err)
@@ -66,13 +73,13 @@ function setSync(key: string, value: unknown): void {
 export const storage = {
   // Factures
   getInvoices: () => get<SavedInvoice[]>(KEYS.INVOICES, []),
-  saveInvoices: (invoices: SavedInvoice[]) => set(KEYS.INVOICES, invoices),
-  saveInvoicesSync: (invoices: SavedInvoice[]) => setSync(KEYS.INVOICES, invoices),
+  saveInvoices: (invoices: SavedInvoice[]) => set(KEYS.INVOICES, invoices, 'invoices:updated'),
+  saveInvoicesSync: (invoices: SavedInvoice[]) => setSync(KEYS.INVOICES, invoices, 'invoices:updated'),
 
   // Compteur
   getCounter: () => get<number>(KEYS.INVOICE_COUNTER, 1),
-  saveCounter: (counter: number) => set(KEYS.INVOICE_COUNTER, counter),
-  saveCounterSync: (counter: number) => setSync(KEYS.INVOICE_COUNTER, counter),
+  saveCounter: (counter: number) => set(KEYS.INVOICE_COUNTER, counter, 'invoice-counter:updated'),
+  saveCounterSync: (counter: number) => setSync(KEYS.INVOICE_COUNTER, counter, 'invoice-counter:updated'),
 
   // Profil émetteur
   async getIssuerProfile(): Promise<IssuerProfile | null> {
@@ -95,11 +102,11 @@ export const storage = {
 
   // Devis
   getQuotes: () => get<SavedQuote[]>(KEYS.QUOTES, []),
-  saveQuotes: (quotes: SavedQuote[]) => set(KEYS.QUOTES, quotes),
-  saveQuotesSync: (quotes: SavedQuote[]) => setSync(KEYS.QUOTES, quotes),
+  saveQuotes: (quotes: SavedQuote[]) => set(KEYS.QUOTES, quotes, 'quotes:updated'),
+  saveQuotesSync: (quotes: SavedQuote[]) => setSync(KEYS.QUOTES, quotes, 'quotes:updated'),
   getQuoteCounter: () => get<number>(KEYS.QUOTE_COUNTER, 1),
-  saveQuoteCounter: (counter: number) => set(KEYS.QUOTE_COUNTER, counter),
-  saveQuoteCounterSync: (counter: number) => setSync(KEYS.QUOTE_COUNTER, counter),
+  saveQuoteCounter: (counter: number) => set(KEYS.QUOTE_COUNTER, counter, 'quote-counter:updated'),
+  saveQuoteCounterSync: (counter: number) => setSync(KEYS.QUOTE_COUNTER, counter, 'quote-counter:updated'),
 
   // Thème
   getTheme: () => get<'light' | 'dark'>(KEYS.THEME, 'light'),
