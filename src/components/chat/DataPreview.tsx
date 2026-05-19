@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pencil, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { round2 } from '@/lib/money'
 import type { ParsedInvoiceData } from '@/types/invoice'
 
 interface DataPreviewProps {
@@ -153,8 +154,8 @@ export function DataPreview({ data, onApply, onCancel }: DataPreviewProps) {
               />
               <input
                 type="number"
-                value={Math.round(item.unitPrice * 100) / 100}
-                onChange={e => updateItem(i, 'unitPrice', Math.max(0, Number(e.target.value) || 0))}
+                value={round2(item.unitPrice)}
+                onChange={e => updateItem(i, 'unitPrice', round2(Math.max(0, Number(e.target.value) || 0)))}
                 className="w-16 px-1 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100 text-right"
                 step="0.01"
               />

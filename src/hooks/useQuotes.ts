@@ -9,6 +9,7 @@ import type {
   QuoteStatus,
 } from '@/types/invoice'
 import { storage } from '@/lib/storage'
+import { normalizeLineItemPrices, mergeLineItem } from '@/lib/money'
 import {
   getDefaultIssuer,
   getDefaultClient,
@@ -18,10 +19,21 @@ import {
   normalizeClientInfo,
 } from '@/lib/constants'
 
-// Migre un devis charge depuis le storage : garantit que son client possede
-// tous les champs actuels (ex: department, addressLine2 ajoutes apres coup).
+// Migre un devis charge depuis le storage :
+//  - garantit que son client possede tous les champs actuels (department,
+//    addressLine2 ajoutes apres coup)
+//  - arrondit les prix de lignes à 2 décimales UNIQUEMENT pour les brouillons.
+//    Un devis envoyé / accepté / refusé est juridiquement engageant : son
+//    total ne doit pas bouger après simple lecture (le client a vu le PDF).
 function normalizeSavedQuote(qt: SavedQuote): SavedQuote {
-  return { ...qt, client: normalizeClientInfo(qt.client) }
+  const items = qt.status === 'brouillon'
+    ? qt.quote.items.map(normalizeLineItemPrices)
+    : qt.quote.items
+  return {
+    ...qt,
+    client: normalizeClientInfo(qt.client),
+    quote: { ...qt.quote, items },
+  }
 }
 
 // Vrai dès qu'un champ "vivant" est rempli — déclenche l'autosave plus tôt
@@ -150,7 +162,7 @@ export function useQuotes() {
       ...prev,
       quote: {
         ...prev.quote,
-        items: prev.quote.items.map(item => item.id === id ? { ...item, ...partial } : item),
+        items: prev.quote.items.map(item => item.id === id ? mergeLineItem(item, partial) : item),
       },
     }))
   }, [])

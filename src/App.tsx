@@ -28,6 +28,7 @@ import {
   buildMetaUpdateFromAI,
   mergeClientFromAI,
 } from "@/lib/applyAIData";
+import { round2 } from "@/lib/money";
 import { generatePDF } from "@/lib/pdf";
 import { storage } from "@/lib/storage";
 import type {
@@ -221,11 +222,12 @@ function App() {
   };
 
   const handleSaveAsTemplate = (item: LineItem) => {
-    // Le template stocke toujours le HT comme forme canonique (item.unitPrice est le HT, derive si TTC)
+    // Le template stocke toujours le HT comme forme canonique, arrondi au centime
+    // pour ne pas propager une éventuelle imprécision de saisie aux factures futures.
     addTemplate({
       description: item.description,
       unit: item.unit,
-      unitPrice: item.unitPrice,
+      unitPrice: round2(item.unitPrice),
       vatRate: item.vatRate,
     });
   };
@@ -239,15 +241,14 @@ function App() {
         ? {
             description: template.description,
             unit: template.unit,
-            unitPrice: template.unitPrice,
-            unitPriceTTC:
-              Math.round(template.unitPrice * (1 + vatRate / 100) * 100) / 100,
+            unitPrice: round2(template.unitPrice),
+            unitPriceTTC: round2(template.unitPrice * (1 + vatRate / 100)),
             vatRate,
           }
         : {
             description: template.description,
             unit: template.unit,
-            unitPrice: template.unitPrice,
+            unitPrice: round2(template.unitPrice),
             vatRate,
           };
     if (view === "QUOTE_EDIT") qt.addLineItem(data);

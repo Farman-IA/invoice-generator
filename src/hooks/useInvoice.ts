@@ -11,6 +11,7 @@ import type {
 } from '@/types/invoice'
 import { storage } from '@/lib/storage'
 import { calculateTotals } from '@/lib/calculations'
+import { normalizeLineItemPrices, mergeLineItem } from '@/lib/money'
 import {
   getDefaultIssuer,
   getDefaultClient,
@@ -20,10 +21,24 @@ import {
   normalizeClientInfo,
 } from '@/lib/constants'
 
-// Migre une facture chargee depuis le storage : garantit que son client possede
-// tous les champs actuels (ex: department, addressLine2 ajoutes apres coup).
+// Migre une facture chargee depuis le storage :
+//  - garantit que son client possede tous les champs actuels (ex: department,
+//    addressLine2 ajoutes apres coup)
+//  - arrondit les prix de lignes à 2 décimales pour les BROUILLONS uniquement
+//    (incident Université de Lorraine, mai 2026). Une facture FINALISÉE est
+//    juridiquement immuable : son total imprimé / envoyé au client doit rester
+//    inchangé même si les prix internes ont une décimale parasite. La migration
+//    sur finalisée changerait le total recalculé → divergence PDF déjà envoyé
+//    vs dashboard CA + import comptable refusé.
 function normalizeSavedInvoice(inv: SavedInvoice): SavedInvoice {
-  return { ...inv, client: normalizeClientInfo(inv.client) }
+  const items = inv.status === 'finalisée'
+    ? inv.invoice.items
+    : inv.invoice.items.map(normalizeLineItemPrices)
+  return {
+    ...inv,
+    client: normalizeClientInfo(inv.client),
+    invoice: { ...inv.invoice, items },
+  }
 }
 
 // Vrai dès qu'un champ "vivant" est rempli — déclenche l'autosave plus tôt
@@ -269,7 +284,7 @@ export function useInvoice() {
       invoice: {
         ...prev.invoice,
         items: prev.invoice.items.map(item =>
-          item.id === id ? { ...item, ...partial } : item
+          item.id === id ? mergeLineItem(item, partial) : item
         ),
       },
     }))

@@ -1,4 +1,5 @@
 import type { ParsedInvoiceData, PriceMode, VatRate } from '@/types/invoice'
+import { round2 } from '@/lib/money'
 
 const VALID_VAT_RATES: VatRate[] = [0, 2.1, 5.5, 10, 20]
 
@@ -12,8 +13,14 @@ function sanitizeVatRate(rate: number): VatRate {
 }
 
 function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
-  // Pas d'arrondi — garder la precision pour que qty × prix HT × (1+TVA) = TTC exact
-  return priceTtc / (1 + vatRate / 100)
+  // Arrondi à 2 décimales : le HT est une donnée monétaire affichée, elle DOIT
+  // être au centime près pour rester cohérente avec l'UI (sinon "29,52" affiché
+  // mais 29,5181818 utilisé en calcul → bug Université de Lorraine, mai 2026).
+  // Le TTC saisi est toujours conservé séparément dans unitPriceTTC pour garantir
+  // que la facture finale soit exacte au TTC d'origine.
+  // Garde : vatRate négatif ou -100 produirait Infinity → retourne priceTtc tel quel.
+  if (vatRate < 0) return round2(priceTtc)
+  return round2(priceTtc / (1 + vatRate / 100))
 }
 
 export function validateParsedData(raw: Record<string, unknown>, priceMode: PriceMode): ParsedInvoiceData | null {

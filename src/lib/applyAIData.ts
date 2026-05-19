@@ -1,6 +1,7 @@
 // Helpers de transformation des donnees retournees par l'IA en mises a jour
 // pour la facture courante. Extrait de App.tsx pour rester testable et lisible.
 
+import { round2 } from '@/lib/money'
 import type {
   ClientInfo,
   ClientRecord,
@@ -82,14 +83,16 @@ export function buildItemsFromAI(
       description: item.description,
       unit: 'unité',
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
+      // round2 défensif : aiValidation arrondit déjà, mais on garantit l'invariant
+      // "tout prix stocké en LineItem est à 2 décimales exactes".
+      unitPrice: round2(item.unitPrice),
       vatRate: item.vatRate,
     }
     if (priceMode === 'ttc') {
       const unitPriceTTC =
         item.unitPriceTTC != null
-          ? item.unitPriceTTC
-          : Math.round(item.unitPrice * (1 + item.vatRate / 100) * 100) / 100
+          ? round2(item.unitPriceTTC)
+          : round2(item.unitPrice * (1 + item.vatRate / 100))
       return { ...base, unitPriceTTC }
     }
     return base

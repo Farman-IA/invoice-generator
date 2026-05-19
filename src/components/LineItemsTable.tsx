@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { InlineEdit } from '@/components/InlineEdit'
 import { calculateLineTotal, formatEuro } from '@/lib/calculations'
+import { round2, getEffectiveUnitPriceHT } from '@/lib/money'
 import { VAT_RATES, PLACEHOLDERS } from '@/lib/constants'
 import type { LineItem, VatRate, ArticleTemplate, PriceMode } from '@/types/invoice'
 
@@ -106,17 +107,22 @@ export function LineItemsTable({
         <tbody>
           {items.map((item) => {
             const isTTC = item.unitPriceTTC != null && item.unitPriceTTC > 0
-            const lineTTC = isTTC ? Math.round(item.quantity * item.unitPriceTTC! * 100) / 100 : 0
-            // lineTotal pour affichage : TTC si mode TTC, HT sinon
+            const lineTTC = isTTC ? round2(item.quantity * item.unitPriceTTC!) : 0
+            // lineTotal pour affichage : TTC si mode TTC, HT sinon.
+            // Toujours basé sur les valeurs stockées arrondies à 2 décimales
+            // pour garantir que "qty × prix affiché" donne exactement le total ligne.
             const lineTotal = isTTCMode
-              ? (isTTC ? lineTTC : Math.round(item.quantity * item.unitPrice * (1 + item.vatRate / 100) * 100) / 100)
+              ? (isTTC ? lineTTC : round2(item.quantity * item.unitPrice * (1 + item.vatRate / 100)))
               : (isTTC
-                  ? Math.round(lineTTC / (1 + item.vatRate / 100) * 100) / 100
+                  ? round2(lineTTC / (1 + item.vatRate / 100))
                   : calculateLineTotal(item.quantity, item.unitPrice))
-            // Prix unitaire affiche dans l'input
-            const displayUnitPrice = isTTCMode
-              ? (item.unitPriceTTC ?? item.unitPrice * (1 + item.vatRate / 100))
-              : item.unitPrice
+            // Prix unitaire affiché dans l'input — déjà arrondi côté stockage,
+            // l'arrondi ici est une ceinture-bretelles pour les données héritées.
+            const displayUnitPrice = round2(
+              isTTCMode
+                ? (item.unitPriceTTC ?? item.unitPrice * (1 + item.vatRate / 100))
+                : item.unitPrice
+            )
             return (
               <tr
                 key={item.id}
@@ -148,15 +154,30 @@ export function LineItemsTable({
                 </td>
                 <td className="py-2.5 px-2 text-right">
                   <InlineEdit
-                    value={String(Math.round(displayUnitPrice * 100) / 100)}
+                    value={String(displayUnitPrice)}
                     onChange={(v) => {
-                      const newPrice = Math.max(0, Number(v) || 0)
+                      // round2 sur la saisie : ce que l'utilisateur tape (et voit)
+                      // EST ce qui est stocké. Plus de divergence entre 29,52 affiché
+                      // et 29,5166 utilisé en calcul.
+                      const newPrice = round2(Math.max(0, Number(v) || 0))
                       if (isTTCMode) {
-                        // Mode TTC : on stocke le TTC, le HT est derive sans arrondi
-                        const newHT = newPrice / (1 + item.vatRate / 100)
+                        // Mode TTC : on stocke le TTC saisi tel quel, le HT
+                        // est dérivé arrondi à 2 décimales pour rester comptable.
+                        const newHT = round2(newPrice / (1 + item.vatRate / 100))
                         onUpdate(item.id, { unitPrice: newHT, unitPriceTTC: newPrice })
                       } else {
-                        // Mode HT : comportement classique, supprime le lien TTC
+                        // Mode HT : si l'utilisateur retape la même valeur HT que
+                        // celle déjà affichée (no-op fréquent en validant le champ),
+                        // on PRÉSERVE l'ancrage TTC original — sinon un cycle
+                        // TTC→HT→sauvegarde sans modif efface le TTC saisi originel
+                        // et fait dériver la valeur d'arrondi en arrondi.
+                        const currentHTAffiche = getEffectiveUnitPriceHT(
+                          item.unitPrice, item.unitPriceTTC, item.vatRate
+                        )
+                        if (newPrice === currentHTAffiche && item.unitPriceTTC != null) {
+                          return // no-op, on conserve le TTC d'origine
+                        }
+                        // Sinon : nouveau HT saisi, on efface unitPriceTTC fantôme.
                         onUpdate(item.id, { unitPrice: newPrice, unitPriceTTC: undefined })
                       }
                     }}
@@ -171,9 +192,16 @@ export function LineItemsTable({
                       onValueChange={(v) => {
                         const newRate = Number(v) as VatRate
                         if (isTTCMode && item.unitPriceTTC != null && item.unitPriceTTC > 0) {
-                          // Mode TTC : recalcule HT a partir du TTC avec le nouveau taux
-                          const newHT = item.unitPriceTTC / (1 + newRate / 100)
+                          // Mode TTC : recalcule HT à partir du TTC avec le nouveau taux,
+                          // arrondi à 2 décimales pour rester cohérent avec l'affichage.
+                          const newHT = round2(item.unitPriceTTC / (1 + newRate / 100))
                           onUpdate(item.id, { vatRate: newRate, unitPrice: newHT })
+                        } else if (item.unitPriceTTC != null) {
+                          // Mode HT mais la ligne a un TTC fantôme (saisie TTC antérieure) :
+                          // changer le taux casserait la cohérence (unitPriceTTC désynchronisé
+                          // du nouveau couple HT × taux). On efface le TTC pour ré-ancrer
+                          // sur le HT actuellement saisi.
+                          onUpdate(item.id, { vatRate: newRate, unitPriceTTC: undefined })
                         } else {
                           onUpdate(item.id, { vatRate: newRate })
                         }
