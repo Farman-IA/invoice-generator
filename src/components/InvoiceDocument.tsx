@@ -1,4 +1,4 @@
-import { forwardRef, useRef } from 'react'
+import { forwardRef, useEffect, useRef } from 'react'
 import { ImagePlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -103,6 +103,26 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, InvoiceDocumentProps>(
     const discount = invoice.discount ?? 0
     const discountType = invoice.discountType ?? 'amount'
     const totals = calculateTotals(invoice.items, { discount, discountType })
+
+    // Alerte utilisateur si la sanitisation a écrasé au moins un champ corrompu
+    // (NaN, Infinity, négatif sur un champ qui n'admet pas le négatif). Cas
+    // typique : une hallucination IA injecte une quantité NaN → la ligne
+    // disparaît silencieusement du total. On veut que Farman le voie, donc
+    // toast persistant (durée longue) avec id stable pour ne pas s'empiler
+    // à chaque frappe. Cf. Finding #5 de l'audit du 2026-05-19.
+    useEffect(() => {
+      if (totals.sanitizedFieldsCount > 0) {
+        toast.warning(
+          `Attention : ${totals.sanitizedFieldsCount} valeur(s) corrompue(s) détectée(s) et corrigée(s) automatiquement. Vérifiez vos lignes (quantités, prix, taux de TVA).`,
+          { id: 'sanitized-fields', duration: 10000 }
+        )
+      } else {
+        // On retire explicitement le toast quand la corruption est résolue —
+        // sinon il survit à la correction par l'utilisateur, ce qui serait
+        // anxiogène ("j'ai corrigé et ça affiche encore l'alerte").
+        toast.dismiss('sanitized-fields')
+      }
+    }, [totals.sanitizedFieldsCount])
 
     // Clamp à la saisie : en mode %, la valeur reste dans 0..100
     // pour éviter qu'un "150%" affiché en PDF ne corresponde pas au calcul (clampé à 100% côté lib)

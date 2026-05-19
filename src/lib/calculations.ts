@@ -21,6 +21,11 @@ export interface InvoiceTotals {
   vatBreakdown: VatBreakdownEntry[]
   totalVAT: number
   totalTTC: number
+  // Nombre total de champs corrompus (NaN, Infinity, négatif sur champ
+  // qui n'admet pas le négatif) détectés et écrasés silencieusement par
+  // la sanitisation. 0 = données propres. >0 = l'UI doit avertir l'utilisateur
+  // qu'au moins une ligne contient une valeur invalide ramenée à 0.
+  sanitizedFieldsCount: number
 }
 
 // Options de remise globale appliquée sur le HT
@@ -76,30 +81,88 @@ interface VatGroup {
 // champs numériques, en gardant la valeur dans des bornes saines.
 // Préfère le silence à l'exception car les totaux sont recalculés à chaque
 // rendu (un throw casserait l'app sur une donnée corrompue).
+//
+// IMPORTANT : ne fait plus de nettoyage silencieux. Chaque champ écrasé est
+// signalé par un `console.warn` détaillé ET listé dans `corruptedFields`.
+// L'appelant (calculateTotals) propage la longueur de cette liste dans
+// `InvoiceTotals.sanitizedFieldsCount` pour que l'UI puisse alerter
+// l'utilisateur (cf. Finding #5 / risque hallucination IA).
 function sanitizeLineItem(item: LineItem): {
   quantity: number
   unitPrice: number
   unitPriceTTC: number | undefined
   vatRate: number
+  corruptedFields: string[]
 } {
-  const quantity = Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 0
-  const unitPrice = Number.isFinite(item.unitPrice) && item.unitPrice >= 0 ? item.unitPrice : 0
-  const unitPriceTTC = Number.isFinite(item.unitPriceTTC) && (item.unitPriceTTC ?? 0) > 0
-    ? item.unitPriceTTC
-    : undefined
-  // Taux de TVA : positif ou nul, et > -100 (sinon division par zéro plus loin)
-  const vatRate = Number.isFinite(item.vatRate) && item.vatRate >= 0 ? item.vatRate : 0
-  return { quantity, unitPrice, unitPriceTTC, vatRate }
+  const corruptedFields: string[] = []
+  // On loggue UNE FOIS par champ corrompu, avec la valeur reçue, pour qu'un
+  // dev (ou Farman) puisse retracer la source — typiquement une hallucination
+  // IA ou un brouillon altéré par une migration.
+  const flag = (field: string, received: unknown) => {
+    corruptedFields.push(field)
+    console.warn(
+      `[calculateTotals] champ corrompu "${field}" sur la ligne ${item.id ?? '(sans id)'} : valeur reçue =`,
+      received,
+      '— remplacée par 0 pour éviter de planter le calcul.'
+    )
+  }
+
+  let quantity: number
+  if (Number.isFinite(item.quantity) && item.quantity > 0) {
+    quantity = item.quantity
+  } else {
+    quantity = 0
+    flag('quantity', item.quantity)
+  }
+
+  let unitPrice: number
+  if (Number.isFinite(item.unitPrice) && item.unitPrice >= 0) {
+    unitPrice = item.unitPrice
+  } else {
+    unitPrice = 0
+    flag('unitPrice', item.unitPrice)
+  }
+
+  // unitPriceTTC est OPTIONNEL : `undefined` n'est PAS une corruption, c'est
+  // simplement une ligne saisie en HT pur. On ne signale que si la valeur est
+  // explicitement présente ET invalide (NaN, Infinity, négatif).
+  let unitPriceTTC: number | undefined
+  if (item.unitPriceTTC === undefined || item.unitPriceTTC === null) {
+    unitPriceTTC = undefined
+  } else if (Number.isFinite(item.unitPriceTTC) && item.unitPriceTTC > 0) {
+    unitPriceTTC = item.unitPriceTTC
+  } else {
+    unitPriceTTC = undefined
+    flag('unitPriceTTC', item.unitPriceTTC)
+  }
+
+  // Taux de TVA : positif ou nul. Un taux négatif ou non fini → 0
+  let vatRate: number
+  if (Number.isFinite(item.vatRate) && item.vatRate >= 0) {
+    vatRate = item.vatRate
+  } else {
+    vatRate = 0
+    flag('vatRate', item.vatRate)
+  }
+
+  return { quantity, unitPrice, unitPriceTTC, vatRate, corruptedFields }
 }
 
 export function calculateTotals(
   items: LineItem[],
   discountOptions: DiscountOptions = {}
 ): InvoiceTotals {
+  // Compteur global de champs corrompus sur l'ensemble des lignes. Sera exposé
+  // dans le retour pour permettre à l'UI d'alerter l'utilisateur (cf. Finding #5).
+  let sanitizedFieldsCount = 0
+
   // Pass 1 : repérer les taux qui contiennent AU MOINS une ligne saisie en TTC.
   // Nécessaire pour décider, en Pass 2, si une ligne HT sur ce taux doit aussi
   // contribuer à totalTTC. Sans cette pré-analyse, l'ordre des lignes change
   // le résultat (une ligne HT avant une ligne TTC sur le même taux serait omise).
+  //
+  // NB : on NE compte PAS les corruptions ici pour éviter le double-comptage —
+  // Pass 2 ré-appelle sanitizeLineItem sur les mêmes items et les recensera.
   const ttcInputRates = new Set<VatRate>()
   for (const raw of items) {
     const safe = sanitizeLineItem(raw)
@@ -111,6 +174,7 @@ export function calculateTotals(
 
   for (const raw of items) {
     const item = sanitizeLineItem(raw)
+    sanitizedFieldsCount += item.corruptedFields.length
     if (item.quantity === 0) continue
 
     const isTTCInput = item.unitPriceTTC != null
@@ -230,7 +294,7 @@ export function calculateTotals(
   const totalVAT = round2(vatBreakdown.reduce((s, e) => s + e.vatAmount, 0))
   const totalTTC = round2(totalHTAfterDiscount + totalVAT)
 
-  return { totalHT, discountAmount, totalHTAfterDiscount, vatBreakdown, totalVAT, totalTTC }
+  return { totalHT, discountAmount, totalHTAfterDiscount, vatBreakdown, totalVAT, totalTTC, sanitizedFieldsCount }
 }
 
 export function formatEuro(amount: number): string {
