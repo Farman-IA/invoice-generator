@@ -18,6 +18,7 @@ import {
   createDefaultLineItem,
   generateQuoteNumber,
   normalizeClientInfo,
+  sanitizeLineItemPayload,
 } from '@/lib/constants'
 
 // Migre un devis charge depuis le storage :
@@ -139,11 +140,19 @@ export function useQuotes() {
   }, [])
 
   const addLineItem = useCallback((data?: Partial<LineItem>) => {
+    // Garde défensive par whitelist : on ne retient des données entrantes que
+    // les clés effectivement listées dans LINE_ITEM_ALLOWED_KEYS (constants.ts).
+    // Robuste face à TOUS les types d'events (SyntheticEvent React, Event natif,
+    // KeyboardEvent, DragEvent), pas seulement aux SyntheticEvent. Cf. incident
+    // 2026-05-20 où onClick={addLineItem} étalait un SyntheticEvent (target =
+    // HTMLButtonElement, view = Window) dans le LineItem et faisait planter
+    // JSON.stringify sur la référence circulaire React Fiber.
+    const safeData = sanitizeLineItemPayload(data)
     setState(prev => ({
       ...prev,
       quote: {
         ...prev.quote,
-        items: [...prev.quote.items, { ...createDefaultLineItem(), ...data }],
+        items: [...prev.quote.items, { ...createDefaultLineItem(), ...safeData }],
       },
     }))
   }, [])

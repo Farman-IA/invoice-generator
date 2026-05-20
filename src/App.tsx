@@ -603,7 +603,7 @@ function App() {
               onUpdateIssuer={inv.isFinalized ? () => {} : inv.updateIssuer}
               onUpdateClient={inv.isFinalized ? () => {} : inv.updateClient}
               onUpdateInvoice={inv.isFinalized ? () => {} : inv.updateInvoice}
-              onAddLine={inv.isFinalized ? () => {} : inv.addLineItem}
+              onAddLine={inv.isFinalized ? () => {} : () => inv.addLineItem()}
               onRemoveLine={inv.isFinalized ? () => {} : inv.removeLineItem}
               onUpdateLine={inv.isFinalized ? () => {} : inv.updateLineItem}
               findClientByName={inv.isFinalized ? undefined : findByName}
@@ -642,7 +642,7 @@ function App() {
             onUpdateIssuer={qt.isLocked ? () => {} : qt.updateIssuer}
             onUpdateClient={qt.isLocked ? () => {} : qt.updateClient}
             onUpdateInvoice={qt.isLocked ? () => {} : qt.updateQuote}
-            onAddLine={qt.isLocked ? () => {} : qt.addLineItem}
+            onAddLine={qt.isLocked ? () => {} : () => qt.addLineItem()}
             onRemoveLine={qt.isLocked ? () => {} : qt.removeLineItem}
             onUpdateLine={qt.isLocked ? () => {} : qt.updateLineItem}
             findClientByName={qt.isLocked ? undefined : findByName}

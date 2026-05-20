@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { runOneShotMigrations } from './lib/migrations'
 
 // Polyfill window.storage si absent (navigateur standard)
 if (!window.storage) {
@@ -16,6 +17,10 @@ if (!window.storage) {
     },
   }
 }
+
+// Migrations idempotentes sur localStorage. Doit tourner AVANT createRoot
+// pour que les hooks (useInvoice, useQuotes) lisent des données propres.
+runOneShotMigrations()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

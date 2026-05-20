@@ -100,6 +100,56 @@ export function createDefaultLineItem(): LineItem {
   }
 }
 
+// Source unique de vérité pour les clés autorisées sur un LineItem stocké.
+// Utilisée à 2 endroits critiques :
+//   1. La migration `migrations.ts` (whitelist en relecture du localStorage)
+//   2. La garde défensive de `addLineItem` (rejet d'un SyntheticEvent React)
+//
+// IMPORTANT : doit refléter EXACTEMENT le type `LineItem` (src/types/invoice.ts).
+// Si un champ y est ajouté (ex: `discount`, `category`), il faut l'ajouter
+// ici aussi — sinon la migration le supprimera silencieusement des anciennes
+// factures et la garde le rejettera côté UI.
+//
+// Le typage `readonly LINE_ITEM_KEY[]` couplé à `satisfies` ci-dessous garantit
+// au compilateur que toutes les clés sont des `keyof LineItem` valides : si
+// quelqu'un fait une faute de frappe ou retire un champ du type, tsc casse.
+type LineItemKey = keyof LineItem
+export const LINE_ITEM_ALLOWED_KEYS: ReadonlySet<LineItemKey> = new Set<LineItemKey>([
+  'id',
+  'description',
+  'unit',
+  'quantity',
+  'unitPrice',
+  'unitPriceTTC',
+  'vatRate',
+])
+
+// Filtre un payload entrant pour ne garder que les clés autorisées d'un LineItem.
+// Robuste face à TOUS les types d'objets pollués (SyntheticEvent React, Event
+// natif, HTMLElement, etc.) : on ne fait JAMAIS confiance à la forme de
+// l'objet entrant, on ne sélectionne que les clés explicitement whitelistées.
+//
+// Utilisée par addLineItem dans useInvoice + useQuotes (source unique).
+//
+// Retourne `undefined` si le payload n'est pas un objet (string, null,
+// number, etc.) ou s'il ne contient AUCUNE clé valide après filtrage —
+// dans ce cas, addLineItem retombera sur createDefaultLineItem() seul.
+export function sanitizeLineItemPayload(data: unknown): Partial<LineItem> | undefined {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return undefined
+  const safe: Partial<LineItem> = {}
+  let hasAnyKey = false
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (LINE_ITEM_ALLOWED_KEYS.has(key as LineItemKey)) {
+      // Cast sûr : on vient juste de vérifier que `key` est une clé valide
+      // de LineItem. Le type des valeurs reste la responsabilité de l'appelant
+      // (les hooks valident ensuite via calculateTotals / sanitizeLineItem).
+      (safe as Record<string, unknown>)[key] = value
+      hasAnyKey = true
+    }
+  }
+  return hasAnyKey ? safe : undefined
+}
+
 export function getDefaultInvoice(counter: number): InvoiceData {
   const today = new Date()
   const dueDate = new Date(today)
