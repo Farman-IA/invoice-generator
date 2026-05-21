@@ -10,6 +10,26 @@ function normalizeClient(client: Partial<ClientRecord> & { id: string; companyNa
   return { ...getDefaultClient(), ...client } as ClientRecord
 }
 
+// Compare deux noms d'entreprise : insensible à la casse et aux espaces de bord.
+// Sert à matcher "CNRS" / " cnrs " / "Cnrs" comme un seul et même client.
+function sameCompanyName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+// Merge "protégé" : on ne remplace un champ existant du carnet QUE si la nouvelle
+// valeur n'est pas vide. Règle CTO : éviter qu'une facture faite à la va-vite
+// (sans adresse ni SIRET) n'efface des infos déjà saisies au carnet.
+function mergeProtected(existing: ClientRecord, incoming: Partial<ClientRecord>): ClientRecord {
+  const result: ClientRecord = { ...existing }
+  for (const [key, value] of Object.entries(incoming)) {
+    if (key === 'id') continue
+    if (typeof value !== 'string') continue
+    if (value.trim() === '') continue
+    ;(result as unknown as Record<string, string>)[key] = value
+  }
+  return result
+}
+
 const SEED_CLIENTS: Omit<ClientRecord, 'id'>[] = [
   {
     ...getDefaultClient(),
@@ -94,5 +114,41 @@ export function useClients() {
     )
   }, [])
 
-  return { clients, addClient, updateClient, deleteClient, findByName, existsByName }
+  // Renvoie le ClientRecord dont le nom matche EXACTEMENT (case+trim) — sert à
+  // l'hydratation auto avant save quand l'utilisateur tape "CNRS" à la main
+  // sans passer par l'autocomplete.
+  const findExactByName = useCallback((name: string): ClientRecord | null => {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    return clientsRef.current.find(c => sameCompanyName(c.companyName, trimmed)) ?? null
+  }, [])
+
+  // upsertClient : si un client de même nom existe → merge protégé (les champs
+  // non-vides du payload écrasent ceux du carnet, les champs vides ne touchent
+  // à rien). Sinon → addClient classique. Sert à garder le carnet à jour quand
+  // on sauvegarde une facture sans perdre les infos déjà saisies au carnet.
+  const upsertClient = useCallback(async (client: Omit<ClientRecord, 'id'>) => {
+    const existing = clientsRef.current.find(c => sameCompanyName(c.companyName, client.companyName))
+    if (!existing) {
+      const newClient: ClientRecord = { ...client, id: crypto.randomUUID() }
+      const updated = [newClient, ...clientsRef.current]
+      setClients(updated)
+      clientsRef.current = updated
+      const result = await storage.saveClients(updated)
+      if (!result.ok && result.reason === 'unknown') toast.error('Erreur de sauvegarde client')
+      return newClient
+    }
+    const merged = mergeProtected(existing, client)
+    // Pas d'écriture inutile si rien n'a changé (évite un toast d'erreur faux
+    // positif et une écriture localStorage gratuite à chaque save de facture).
+    if (JSON.stringify(merged) === JSON.stringify(existing)) return existing
+    const updated = clientsRef.current.map(c => c.id === existing.id ? merged : c)
+    setClients(updated)
+    clientsRef.current = updated
+    const result = await storage.saveClients(updated)
+    if (!result.ok && result.reason === 'unknown') toast.error('Erreur de mise à jour client')
+    return merged
+  }, [])
+
+  return { clients, addClient, upsertClient, updateClient, deleteClient, findByName, findExactByName, existsByName }
 }

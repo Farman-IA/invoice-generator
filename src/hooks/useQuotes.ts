@@ -126,6 +126,16 @@ export function useQuotes() {
     setState(prev => ({ ...prev, client: { ...prev.client, ...partial } }))
   }, [])
 
+  // Comme updateClient mais sync AUSSI stateRef tout de suite. Indispensable
+  // quand l'appelant enchaîne un save juste après (cf. useInvoice.hydrateClient
+  // pour le détail). Sert à l'hydratation auto du client depuis le carnet
+  // avant la sauvegarde d'un devis.
+  const hydrateClient = useCallback((partial: Partial<ClientInfo>) => {
+    const next = { ...stateRef.current, client: { ...stateRef.current.client, ...partial } }
+    stateRef.current = next
+    setState(next)
+  }, [])
+
   const updateQuote = useCallback((partial: Partial<QuoteData>) => {
     setState(prev => {
       const updated = { ...prev.quote, ...partial }
@@ -485,6 +495,7 @@ export function useQuotes() {
     isLocked,
     updateIssuer,
     updateClient,
+    hydrateClient,
     updateQuote,
     addLineItem,
     removeLineItem,

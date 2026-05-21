@@ -306,6 +306,17 @@ export function useInvoice() {
     setState(prev => ({ ...prev, client: { ...prev.client, ...partial } }))
   }, [])
 
+  // Comme updateClient mais sync AUSSI stateRef tout de suite. Indispensable
+  // quand l'appelant enchaîne un save juste après : upsertAndPersist lit
+  // stateRef.current, et React n'a pas encore eu le temps de propager le
+  // setState au useEffect qui synchronise la ref. Sert à l'hydratation
+  // automatique du client depuis le carnet juste avant save (cf. App.tsx).
+  const hydrateClient = useCallback((partial: Partial<ClientInfo>) => {
+    const next = { ...stateRef.current, client: { ...stateRef.current.client, ...partial } }
+    stateRef.current = next
+    setState(next)
+  }, [])
+
   const updateInvoice = useCallback((partial: Partial<InvoiceData>) => {
     setState(prev => ({ ...prev, invoice: { ...prev.invoice, ...partial } }))
   }, [])
@@ -614,6 +625,7 @@ export function useInvoice() {
     setView,
     updateIssuer,
     updateClient,
+    hydrateClient,
     updateInvoice,
     addLineItem,
     removeLineItem,

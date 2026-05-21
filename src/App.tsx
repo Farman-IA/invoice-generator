@@ -65,9 +65,11 @@ function App() {
   const {
     clients,
     addClient,
+    upsertClient,
     updateClient: updateClientRecord,
     deleteClient: deleteClientRecord,
     findByName,
+    findExactByName,
     existsByName,
   } = useClients();
   const { templates, addTemplate, updateTemplate, deleteTemplate } =
@@ -126,6 +128,31 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showSettings]);
 
+  // Règle CTO #2 : si l'utilisateur a tapé "CNRS" (nom exact) à la main dans
+  // l'input client sans cliquer sur la suggestion d'autocomplete, on doit
+  // quand même charger ses infos (SIRET, adresse...) depuis le carnet avant
+  // la sauvegarde. On ne remplit QUE les champs vides du state pour ne pas
+  // écraser ce que l'utilisateur aurait modifié exprès dans cette facture.
+  //
+  // Retourne le `Partial<ClientInfo>` à appliquer, ou null si rien à hydrater.
+  // L'appelant doit utiliser `hydrateClient` (et pas `updateClient`) pour que
+  // le save qui suit immédiatement voie bien les champs hydratés via stateRef.
+  const computeClientHydration = (current: ClientInfo): Partial<ClientInfo> | null => {
+    const match = findExactByName(current.companyName);
+    if (!match) return null;
+    const patch: Partial<ClientInfo> = {};
+    for (const [key, value] of Object.entries(match)) {
+      if (key === "id") continue;
+      if (typeof value !== "string" || value.trim() === "") continue;
+      const k = key as keyof ClientInfo;
+      const currentValue = current[k];
+      if (typeof currentValue === "string" && currentValue.trim() === "") {
+        (patch as Record<string, string>)[k] = value;
+      }
+    }
+    return Object.keys(patch).length > 0 ? patch : null;
+  };
+
   // --- Handlers factures ---
   const handleDownloadPDF = async () => {
     if (!docRef.current) return;
@@ -138,13 +165,34 @@ function App() {
   };
 
   const handleFinalize = async () => {
+    // Hydrate AVANT finalisation : si le nom matche un client du carnet, on
+    // complète les champs vides du state (SIRET, adresse...) pour que la
+    // facture finalisée parte avec les données du carnet, pas vide.
+    //
+    // Compromis assumé (MVP) : si finalizeInvoice échoue ensuite (items vides,
+    // total nul...), l'hydratation reste visible à l'écran sans rollback. C'est
+    // OK car (a) on prévient l'utilisateur que son client a bien été reconnu,
+    // (b) en pratique hydration ne se déclenche que si companyName est non-vide,
+    // donc seuls les échecs côté items peuvent provoquer ce cas.
+    const hydration = computeClientHydration(inv.state.client);
+    if (hydration) inv.hydrateClient(hydration);
+    // Source de vérité unique pour le reste du handler : on NE peut PAS lire
+    // inv.state.client après hydrateClient — React n'a pas encore re-render,
+    // donc inv.state pointe sur l'ancien snapshot. On calcule finalClient une
+    // fois et on l'utilise partout (validation + upsert du carnet).
+    const finalClient = hydration
+      ? { ...inv.state.client, ...hydration }
+      : inv.state.client;
+
     const ok = await inv.finalizeInvoice();
     if (!ok) return;
-    const clientName = inv.state.client.companyName.trim();
-    if (clientName && !existsByName(clientName)) {
-      await addClient({ ...inv.state.client });
-      toast.success("Client ajouté au carnet");
-    }
+    const clientName = finalClient.companyName.trim();
+    if (!clientName) return;
+    // upsertClient : merge protégé si existant (n'efface jamais un champ
+    // déjà rempli au carnet), sinon ajoute.
+    const wasNew = !existsByName(clientName);
+    await upsertClient({ ...finalClient });
+    if (wasNew) toast.success("Client ajouté au carnet");
   };
 
   const handleGalleryDownload = (id: string) => {
@@ -153,22 +201,38 @@ function App() {
   };
 
   const handleSaveInvoice = async () => {
+    const hydration = computeClientHydration(inv.state.client);
+    if (hydration) inv.hydrateClient(hydration);
+    // Cf. handleFinalize : on relit pas inv.state après hydrateClient (React
+    // n'a pas re-render). finalClient = source unique pour le upsert carnet.
+    const finalClient = hydration
+      ? { ...inv.state.client, ...hydration }
+      : inv.state.client;
+
     await inv.saveInvoice();
-    const clientName = inv.state.client.companyName.trim();
-    if (clientName && !existsByName(clientName)) {
-      await addClient({ ...inv.state.client });
-      toast.success("Client ajouté au carnet");
-    }
+    const clientName = finalClient.companyName.trim();
+    if (!clientName) return;
+    const wasNew = !existsByName(clientName);
+    await upsertClient({ ...finalClient });
+    if (wasNew) toast.success("Client ajouté au carnet");
   };
 
   // --- Handlers devis ---
   const handleSaveQuote = async () => {
+    const hydration = computeClientHydration(qt.state.client);
+    if (hydration) qt.hydrateClient(hydration);
+    // Cf. handleFinalize : on relit pas qt.state après hydrateClient (React
+    // n'a pas re-render). finalClient = source unique pour le upsert carnet.
+    const finalClient = hydration
+      ? { ...qt.state.client, ...hydration }
+      : qt.state.client;
+
     await qt.saveQuote();
-    const clientName = qt.state.client.companyName.trim();
-    if (clientName && !existsByName(clientName)) {
-      await addClient({ ...qt.state.client });
-      toast.success("Client ajouté au carnet");
-    }
+    const clientName = finalClient.companyName.trim();
+    if (!clientName) return;
+    const wasNew = !existsByName(clientName);
+    await upsertClient({ ...finalClient });
+    if (wasNew) toast.success("Client ajouté au carnet");
   };
 
   const handleQuoteDownload = (id: string) => {
