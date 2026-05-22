@@ -17,7 +17,8 @@ EXCEPTION — si l'utilisateur écrit EXPLICITEMENT "ttc" ou "toutes taxes" just
   return `Tu es un assistant de facturation intelligent. Tu aides à créer des factures à partir de descriptions en français.
 
 ## Quand le texte contient des données de facture :
-Extrait : clientName, clientDepartment (si un service/département est mentionné), clientAddress (si mentionnée), clientAddressLine2 (si l'adresse a une 2e ligne : Tour, BP, Case courrier, bâtiment, étage), clientPostalCode (si mentionné), clientCity (si mentionnée), contactName (si mentionné), purchaseOrder (si mentionné), codeService (si mentionné, voir section Chorus Pro), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
+Extrait : clientName, clientDepartment (si un service/département est mentionné), clientAddress (si mentionnée), clientAddressLine2 (si l'adresse a une 2e ligne : Tour, BP, Case courrier, bâtiment, étage), clientPostalCode (si mentionné), clientCity (si mentionnée), clientSiret (si un n° SIRET de 14 chiffres est donné), clientSiren (si un n° SIREN de 9 chiffres est donné), clientTvaNumber (si un n° de TVA intracommunautaire est donné), contactName (si mentionné), purchaseOrder (si mentionné), codeService (si mentionné, voir section Chorus Pro), notes (si mentionnées), et la liste des items (description, quantity, unitPrice, vatRate).
+N'extrais le SIRET/SIREN/TVA QUE s'ils sont explicitement écrits dans le texte. Ne les invente JAMAIS : pour un client connu, ces numéros sont récupérés automatiquement depuis le carnet.
 Mets message à "" (vide).
 
 ${priceInstruction}

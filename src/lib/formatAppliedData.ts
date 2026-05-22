@@ -9,6 +9,11 @@ export function formatAppliedData(data: ParsedInvoiceData): string {
     if (data.clientAddress) clientLine += `\n${data.clientAddress}`
     if (data.clientPostalCode || data.clientCity) clientLine += `\n${[data.clientPostalCode, data.clientCity].filter(Boolean).join(' ')}`
     if (data.contactName) clientLine += `\nContact : ${data.contactName}`
+    // Identifiants légaux : on les affiche dans la confirmation pour que
+    // l'utilisateur garde une trace de ce que l'IA a réellement appliqué.
+    if (data.clientSiret) clientLine += `\nSIRET : ${data.clientSiret}`
+    if (data.clientSiren) clientLine += `\nSIREN : ${data.clientSiren}`
+    if (data.clientTvaNumber) clientLine += `\nTVA : ${data.clientTvaNumber}`
     lines.push(clientLine)
   }
   if (data.purchaseOrder) lines.push(`Bon de commande : ${data.purchaseOrder}`)

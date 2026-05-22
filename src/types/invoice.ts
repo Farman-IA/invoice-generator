@@ -171,6 +171,11 @@ export interface ParsedInvoiceData {
   clientAddressLine2?: string
   clientPostalCode?: string
   clientCity?: string
+  // Identifiants légaux du client que l'IA peut extraire d'un texte dicté
+  // (utile pour un NOUVEAU client ; pour un client connu, on les reprend du carnet).
+  clientSiret?: string
+  clientSiren?: string
+  clientTvaNumber?: string
   contactName?: string
   purchaseOrder?: string
   codeService?: string

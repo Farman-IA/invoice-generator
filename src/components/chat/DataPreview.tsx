@@ -106,6 +106,22 @@ export function DataPreview({ data, onApply, onCancel }: DataPreviewProps) {
         />
       )}
 
+      {/* Identifiants légaux : affichés UNIQUEMENT si l'IA en a extrait, pour que
+          l'utilisateur relise/corrige un SIRET avant qu'il n'aille sur la facture. */}
+      {(draft.clientSiret !== undefined || draft.clientSiren !== undefined || draft.clientTvaNumber !== undefined) && (
+        <div className="grid grid-cols-3 gap-1">
+          {draft.clientSiret !== undefined && (
+            <input value={draft.clientSiret ?? ''} onChange={e => updateField('clientSiret', e.target.value)} placeholder="N° SIRET" className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100" />
+          )}
+          {draft.clientSiren !== undefined && (
+            <input value={draft.clientSiren ?? ''} onChange={e => updateField('clientSiren', e.target.value)} placeholder="N° SIREN" className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100" />
+          )}
+          {draft.clientTvaNumber !== undefined && (
+            <input value={draft.clientTvaNumber ?? ''} onChange={e => updateField('clientTvaNumber', e.target.value)} placeholder="N° TVA" className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100" />
+          )}
+        </div>
+      )}
+
       {/* Bon de commande / Code service Chorus Pro (administration publique) */}
       {(draft.purchaseOrder !== undefined || draft.codeService !== undefined) && (
         <div className="grid grid-cols-2 gap-1">

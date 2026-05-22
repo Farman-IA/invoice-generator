@@ -31,18 +31,33 @@ export function mergeClientFromAI(
   const matches = findByName(data.clientName)
   if (matches.length > 0) {
     const match = matches[0]
-    return {
-      companyName: match.companyName,
-      department: data.clientDepartment || match.department,
-      contactName: data.contactName || match.contactName,
-      address: data.clientAddress || match.address,
-      addressLine2: data.clientAddressLine2 || match.addressLine2,
-      postalCode: data.clientPostalCode || match.postalCode,
-      city: data.clientCity || match.city,
-      siren: match.siren,
-      tvaNumber: match.tvaNumber,
-      codeService: data.codeService || match.codeService,
+    // On reprend les infos du carnet (SIRET, SIREN, TVA, tél, email, APE...) pour
+    // ne plus jamais en "oublier" : avant ce fix, la liste des champs recopiés
+    // était écrite à la main et le SIRET en était absent → il disparaissait de la
+    // facture alors qu'il était enregistré au carnet.
+    //
+    // IMPORTANT : on ne recopie QUE les champs NON VIDES du carnet. Sinon un champ
+    // vide du carnet (ex: téléphone non renseigné) écraserait une valeur que
+    // l'utilisateur a tapée à la main sur la facture en cours.
+    const merged: Partial<ClientInfo> = { companyName: match.companyName }
+    for (const [key, value] of Object.entries(match)) {
+      if (key === 'id') continue
+      if (typeof value === 'string' && value.trim() !== '') {
+        ;(merged as Record<string, string>)[key] = value
+      }
     }
+    // L'IA n'écrase ensuite un champ que si elle a fourni une valeur non vide.
+    if (data.clientDepartment) merged.department = data.clientDepartment
+    if (data.contactName) merged.contactName = data.contactName
+    if (data.clientAddress) merged.address = data.clientAddress
+    if (data.clientAddressLine2) merged.addressLine2 = data.clientAddressLine2
+    if (data.clientPostalCode) merged.postalCode = data.clientPostalCode
+    if (data.clientCity) merged.city = data.clientCity
+    if (data.clientSiret) merged.siret = data.clientSiret
+    if (data.clientSiren) merged.siren = data.clientSiren
+    if (data.clientTvaNumber) merged.tvaNumber = data.clientTvaNumber
+    if (data.codeService) merged.codeService = data.codeService
+    return merged
   }
 
   if (isNewInvoice) {
@@ -54,8 +69,9 @@ export function mergeClientFromAI(
       addressLine2: data.clientAddressLine2 ?? '',
       postalCode: data.clientPostalCode ?? '',
       city: data.clientCity ?? '',
-      siren: '',
-      tvaNumber: '',
+      siret: data.clientSiret ?? '',
+      siren: data.clientSiren ?? '',
+      tvaNumber: data.clientTvaNumber ?? '',
       codeService: data.codeService ?? '',
     }
   }
@@ -68,6 +84,9 @@ export function mergeClientFromAI(
   if (data.clientAddressLine2) update.addressLine2 = data.clientAddressLine2
   if (data.clientPostalCode) update.postalCode = data.clientPostalCode
   if (data.clientCity) update.city = data.clientCity
+  if (data.clientSiret) update.siret = data.clientSiret
+  if (data.clientSiren) update.siren = data.clientSiren
+  if (data.clientTvaNumber) update.tvaNumber = data.clientTvaNumber
   if (data.codeService) update.codeService = data.codeService
   return update
 }

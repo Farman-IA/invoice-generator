@@ -12,6 +12,25 @@ function sanitizeVatRate(rate: number): VatRate {
   return 20
 }
 
+// SIRET/SIREN : on ne garde QUE les chiffres, pour normaliser toutes les façons
+// de dicter le numéro ("130 015 506 00013", "130.015.506.00013", "130-015-...").
+// C'est ce que Chorus Pro attend (14 chiffres pour le SIRET, 9 pour le SIREN).
+// Renvoie undefined si vide.
+function sanitizeIdNumber(raw: unknown): string | undefined {
+  if (!raw) return undefined
+  const digits = String(raw).replace(/\D/g, '')
+  return digits !== '' ? digits : undefined
+}
+
+// N° TVA intracommunautaire : contient des lettres (ex: "FR47130015506"), donc
+// on ne peut pas filtrer les chiffres. On retire juste les espaces et on met en
+// majuscules. Renvoie undefined si vide (même contrat que sanitizeIdNumber).
+function sanitizeVatNumber(raw: unknown): string | undefined {
+  if (!raw) return undefined
+  const cleaned = String(raw).replace(/\s/g, '').toUpperCase()
+  return cleaned !== '' ? cleaned : undefined
+}
+
 function convertTtcToHt(priceTtc: number, vatRate: VatRate): number {
   // Arrondi à 2 décimales : le HT est une donnée monétaire affichée, elle DOIT
   // être au centime près pour rester cohérente avec l'UI (sinon "29,52" affiché
@@ -60,6 +79,9 @@ export function validateParsedData(raw: Record<string, unknown>, priceMode: Pric
     clientAddressLine2: raw.clientAddressLine2 ? String(raw.clientAddressLine2) : undefined,
     clientPostalCode: raw.clientPostalCode ? String(raw.clientPostalCode) : undefined,
     clientCity: raw.clientCity ? String(raw.clientCity).toUpperCase() : undefined,
+    clientSiret: sanitizeIdNumber(raw.clientSiret),
+    clientSiren: sanitizeIdNumber(raw.clientSiren),
+    clientTvaNumber: sanitizeVatNumber(raw.clientTvaNumber),
     contactName: raw.contactName ? String(raw.contactName) : undefined,
     purchaseOrder: raw.purchaseOrder ? String(raw.purchaseOrder) : undefined,
     codeService: raw.codeService ? String(raw.codeService) : undefined,
