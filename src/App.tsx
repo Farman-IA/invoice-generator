@@ -1,5 +1,6 @@
 import { AIChatBubble } from "@/components/AIChatBubble";
 import { AIChatPanel } from "@/components/AIChatPanel";
+import { BackupSection } from "@/components/BackupSection";
 import { ClientsManager } from "@/components/ClientsManager";
 import { Dashboard } from "@/components/Dashboard";
 import { InvoiceDocument } from "@/components/InvoiceDocument";
@@ -40,6 +41,7 @@ import type {
   VatRate,
 } from "@/types/invoice";
 import {
+  Archive,
   Bookmark,
   Download,
   FilePen,
@@ -113,6 +115,7 @@ function App() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -547,6 +550,18 @@ function App() {
                       Modèles d'articles
                     </span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setShowBackup(true);
+                      setShowSettings(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
+                  >
+                    <Archive className="size-4 text-gray-400" />
+                    <span className="text-gray-700 dark:text-gray-200">
+                      Sauvegarde
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
@@ -749,6 +764,7 @@ function App() {
         onUpdate={updateTemplate}
         onDelete={deleteTemplate}
       />
+      <BackupSection open={showBackup} onOpenChange={setShowBackup} />
 
       <Dialog open={showFinalizeConfirm} onOpenChange={setShowFinalizeConfirm}>
         <DialogContent>
