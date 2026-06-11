@@ -30,11 +30,22 @@ export const RECURRING_CLIENTS: RecurringClient[] = [
   },
   {
     name: 'CIC / CAP COMPETENCES (formation professionnelle)',
-    rules: `- Contact récurrent : Alexiane BELMOSTEFAOUI
-- Adresse : 4 rue Frédéric-Guillaume RAIFFEISEN, 67913 Strasbourg Cedex 9
-- CONTEXTE : les factures CAP COMPETENCES contiennent TOUJOURS un "code session" au format XXXXXXX-XXXXXX-XXX (ex: 0028310-000062-001) associé à une date de prestation (ex: "14 repas complets le 21/01/2026 code session : 0028310-000062-001").
-- RÈGLE IMPORTANTE : PRÉSERVE INTÉGRALEMENT ce code session et la date dans le champ "description" de la ligne. NE l'extrais PAS dans un autre champ.
-- Exemple correct de ligne CIC : description: "Repas complet le 21/01/2026 code session : 0028310-000062-001", quantity: 14, unitPrice: 30, vatRate: 10`,
+    rules: `- Décomposition EXACTE de l'adresse (ne JAMAIS improviser une autre répartition) :
+  clientAddress: "4 rue Frédéric-Guillaume Raiffeisen", clientPostalCode: "67913", clientCity: "STRASBOURG CEDEX 9".
+  Ne RIEN mettre dans clientAddressLine2 ni clientDepartment pour ce client.
+- Contact récurrent : Alexiane BELMOSTEFAOUI → contactName UNIQUEMENT (jamais dans clientDepartment).
+- CONTEXTE : CAP COMPETENCES demande de facturer des déjeuners par SESSION de formation. Chaque session a : une date, un nombre de déjeuners (personnes), un responsable de groupe, et un "code session" au format XXXXXXX-XXXXXX-XXX (ex: 0028310-000062-001). Un même message peut contenir PLUSIEURS sessions.
+- RÈGLE : chaque session = UNE ligne de facture séparée.
+  quantity = nombre de déjeuners de la session.
+  description = "Repas complets le JJ/MM/AAAA code session : XXXXXXX-XXXXXX-XXX".
+  PRÉSERVE le code session à l'identique (chiffres et tirets exacts). Le responsable du groupe n'apparaît PAS sur la facture.
+- Prix habituel : 30 € TTC par repas. TVA : 10 (restauration sur place).
+- Si l'utilisateur donne un montant TOTAL par session (pas un prix par personne) : ligne en quantity: 1, le nombre de repas passe dans la description (ex: "13 repas complets le 10/06/2026 code session : 0011263-001032-001"), et le montant total comme prix.
+- Exemple — "13 déjeuners le 10/06/2026 resp. GT FORMATION code session 0011263-001032-001, 14 déjeuners le 11/06/2026 resp. DELATTRE Sébastien code session 0012111-001029-001, 30 euros ttc par personne" →
+  items: [
+    {description: "Repas complets le 10/06/2026 code session : 0011263-001032-001", quantity: 13, unitPrice: 30, vatRate: 10},
+    {description: "Repas complets le 11/06/2026 code session : 0012111-001029-001", quantity: 14, unitPrice: 30, vatRate: 10}
+  ]`,
   },
 ]
 
