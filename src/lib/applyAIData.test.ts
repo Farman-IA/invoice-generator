@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { mergeClientFromAI } from './applyAIData'
+import { buildItemsFromAI, mergeClientFromAI } from './applyAIData'
+import { validateParsedData } from './aiValidation'
+import { calculateTotals } from './calculations'
 import type { ClientRecord, ParsedInvoiceData } from '@/types/invoice'
 
 // Fabrique un client de carnet complet, avec un SIRET renseigné par défaut.
@@ -119,6 +121,54 @@ describe('mergeClientFromAI — nouveau client (pas dans le carnet)', () => {
       () => [],
     )
     expect(result?.siret).toBe('')
+  })
+})
+
+describe('buildItemsFromAI — préservation du TTC saisi', () => {
+  it('garde unitPriceTTC même en mode HT (TTC énoncé = source de vérité)', () => {
+    const data: ParsedInvoiceData = {
+      clientName: 'X',
+      items: [{ description: 'Repas', quantity: 13, unitPrice: 27.27, unitPriceTTC: 30, vatRate: 10 }],
+    }
+    const items = buildItemsFromAI(data, 'ht')
+    expect(items[0].unitPriceTTC).toBe(30)
+  })
+
+  it('dérive unitPriceTTC en mode TTC quand seule la valeur HT existe', () => {
+    const data: ParsedInvoiceData = {
+      clientName: 'X',
+      items: [{ description: 'Salle', quantity: 1, unitPrice: 500, vatRate: 20 }],
+    }
+    const items = buildItemsFromAI(data, 'ttc')
+    expect(items[0].unitPriceTTC).toBe(600)
+  })
+})
+
+// Le scénario réel du 11/06/2026 : mail CAP COMPETENCES à 4 sessions,
+// 30 € TTC par déjeuner. Chaîne complète réponse IA brute → validation →
+// lignes de facture → totaux. Le total TTC doit tomber PILE sur
+// 53 déjeuners × 30 € = 1590,00 € (pas 1589,96), grâce au mode "TTC saisi".
+describe('intégration — facture CAP COMPETENCES 4 sessions', () => {
+  it('4 lignes, codes session préservés, total TTC exact à 1590,00 €', () => {
+    const aiRaw = {
+      clientName: 'CIC / CAP COMPETENCES',
+      items: [
+        { description: 'Repas complets le 10/06/2026 code session : 0011263-001032-001', quantity: 13, amount: 30, amountKind: 'unit_ttc', vatRate: 10 },
+        { description: 'Repas complets le 11/06/2026 code session : 0028323-000139-001', quantity: 13, amount: 30, amountKind: 'unit_ttc', vatRate: 10 },
+        { description: 'Repas complets le 11/06/2026 code session : 0012111-001029-001', quantity: 14, amount: 30, amountKind: 'unit_ttc', vatRate: 10 },
+        { description: 'Repas complets le 12/06/2026 code session : 0019727-000598-001', quantity: 13, amount: 30, amountKind: 'unit_ttc', vatRate: 10 },
+      ],
+    }
+    const parsed = validateParsedData(aiRaw, 'ht')
+    expect(parsed).not.toBeNull()
+    expect(parsed!.items).toHaveLength(4)
+    expect(parsed!.items[0].description).toContain('0011263-001032-001')
+
+    const lineItems = buildItemsFromAI(parsed!, 'ht')
+    const totals = calculateTotals(lineItems)
+    expect(totals.totalTTC).toBe(1590)
+    expect(totals.vatBreakdown).toHaveLength(1)
+    expect(totals.vatBreakdown[0].rate).toBe(10)
   })
 })
 

@@ -8,15 +8,18 @@ import { formatAppliedData } from '@/lib/formatAppliedData'
 import { ChatMessages, type ChatMessage } from './chat/ChatMessages'
 import { ChatInput, type ChatInputHandle } from './chat/ChatInput'
 import { InlineApiKeyForm } from './chat/InlineApiKeyForm'
-import type { AISettings, ParsedInvoiceData } from '@/types/invoice'
+import type { AISettings, ParsedInvoiceData, PriceMode } from '@/types/invoice'
 
 interface AIChatPanelProps {
   open: boolean
   onClose: () => void
   onApplyData: (data: ParsedInvoiceData) => void
+  // Mode HT/TTC de la facture à l'écran : transmis à l'IA pour que ses
+  // interprétations de montants collent au mode réellement affiché.
+  priceMode?: PriceMode
 }
 
-export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
+export function AIChatPanel({ open, onClose, onApplyData, priceMode }: AIChatPanelProps) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [retryCountdown, setRetryCountdown] = useState(0)
@@ -116,7 +119,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
       .filter(m => m.role !== 'error')
       .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
-    const result = await parse(text, history)
+    const result = await parse(text, history, priceMode)
     displayParseResult(result, { enableRetry: true })
   }
 
@@ -134,7 +137,7 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
     // Affiche un message "utilisateur" décoratif avec le nom du fichier
     addMessage({ role: 'user', content: `📎 ${file.name}` })
 
-    const result = await parseFile(file)
+    const result = await parseFile(file, priceMode)
     displayParseResult(result, { enableRetry: false })
   }
 

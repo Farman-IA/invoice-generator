@@ -107,12 +107,15 @@ export function buildItemsFromAI(
       unitPrice: round2(item.unitPrice),
       vatRate: item.vatRate,
     }
+    // Un TTC énoncé par l'utilisateur est conservé QUEL QUE SOIT le mode
+    // d'affichage : c'est lui la source de vérité du total de la ligne
+    // (mode "TTC saisi sacré" de calculateTotals).
+    if (item.unitPriceTTC != null) {
+      return { ...base, unitPriceTTC: round2(item.unitPriceTTC) }
+    }
+    // Mode TTC sans TTC énoncé : on dérive pour que la colonne TTC soit remplie.
     if (priceMode === 'ttc') {
-      const unitPriceTTC =
-        item.unitPriceTTC != null
-          ? round2(item.unitPriceTTC)
-          : round2(item.unitPrice * (1 + item.vatRate / 100))
-      return { ...base, unitPriceTTC }
+      return { ...base, unitPriceTTC: round2(item.unitPrice * (1 + item.vatRate / 100)) }
     }
     return base
   })

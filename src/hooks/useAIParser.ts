@@ -3,7 +3,7 @@ import { storage } from '@/lib/storage'
 import { getProvider, callGemini, callOpenAI, formatError } from '@/lib/aiClient'
 import { buildSystemPrompt } from '@/lib/aiPrompt'
 import { validateParsedData } from '@/lib/aiValidation'
-import type { AISettings, ParsedInvoiceData } from '@/types/invoice'
+import type { AISettings, ParsedInvoiceData, PriceMode } from '@/types/invoice'
 
 export interface AIParseResult {
   data: ParsedInvoiceData | null
@@ -25,7 +25,10 @@ export function useAIParser() {
     await storage.saveAISettings(newSettings)
   }, [])
 
-  const parse = useCallback(async (text: string, history: { role: 'user' | 'assistant'; content: string }[] = []): Promise<AIParseResult> => {
+  // priceModeOverride : le mode HT/TTC de la FACTURE à l'écran (source de
+  // vérité unique). Sans lui, on retombe sur le vieux réglage IA — qui
+  // pouvait contredire le mode de la facture et fausser les conversions.
+  const parse = useCallback(async (text: string, history: { role: 'user' | 'assistant'; content: string }[] = [], priceModeOverride?: PriceMode): Promise<AIParseResult> => {
     const currentSettings = await storage.getAISettings()
     if (currentSettings) setSettings(currentSettings)
 
@@ -37,7 +40,7 @@ export function useAIParser() {
     const provider = getProvider(currentSettings)
 
     try {
-      const priceMode = currentSettings.priceMode ?? 'ht'
+      const priceMode = priceModeOverride ?? currentSettings.priceMode ?? 'ht'
       const systemPrompt = buildSystemPrompt(priceMode)
 
       // L'historique part comme de vrais tours de conversation (10 derniers),

@@ -131,7 +131,9 @@ async function callOpenAIWithFile(
 export function useAIFileParser() {
   const [isLoading, setIsLoading] = useState(false)
 
-  const parseFile = useCallback(async (file: File): Promise<AIParseResult> => {
+  // priceModeOverride : même contrat que useAIParser.parse — le mode HT/TTC
+  // de la facture à l'écran prime sur le vieux réglage IA.
+  const parseFile = useCallback(async (file: File, priceModeOverride?: PriceMode): Promise<AIParseResult> => {
     // 1) Valide le fichier (type, taille)
     const validation = validateFile(file)
     if (!validation.ok) {
@@ -148,7 +150,7 @@ export function useAIFileParser() {
     const provider = getProvider(settings)
 
     try {
-      const priceMode = settings.priceMode ?? 'ht'
+      const priceMode = priceModeOverride ?? settings.priceMode ?? 'ht'
       const systemPrompt = buildSystemPrompt(priceMode)
 
       let rawJson: string

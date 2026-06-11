@@ -39,12 +39,12 @@ export const RECURRING_CLIENTS: RecurringClient[] = [
   quantity = nombre de déjeuners de la session.
   description = "Repas complets le JJ/MM/AAAA code session : XXXXXXX-XXXXXX-XXX".
   PRÉSERVE le code session à l'identique (chiffres et tirets exacts). Le responsable du groupe n'apparaît PAS sur la facture.
-- Prix habituel : 30 € TTC par repas. TVA : 10 (restauration sur place).
-- Si l'utilisateur donne un montant TOTAL par session (pas un prix par personne) : ligne en quantity: 1, le nombre de repas passe dans la description (ex: "13 repas complets le 10/06/2026 code session : 0011263-001032-001"), et le montant total comme prix.
+- Prix habituel : 30 € TTC par repas → amount: 30, amountKind: "unit_ttc". TVA : 10 (restauration sur place).
+- Si l'utilisateur donne un montant TOTAL par session (pas un prix par personne) : ligne en quantity: 1, le nombre de repas passe dans la description (ex: "13 repas complets le 10/06/2026 code session : 0011263-001032-001"), et le montant total dans amount (amountKind: "total_ttc" ou "total_ht" selon l'énoncé).
 - Exemple — "13 déjeuners le 10/06/2026 resp. GT FORMATION code session 0011263-001032-001, 14 déjeuners le 11/06/2026 resp. DELATTRE Sébastien code session 0012111-001029-001, 30 euros ttc par personne" →
   items: [
-    {description: "Repas complets le 10/06/2026 code session : 0011263-001032-001", quantity: 13, unitPrice: 30, vatRate: 10},
-    {description: "Repas complets le 11/06/2026 code session : 0012111-001029-001", quantity: 14, unitPrice: 30, vatRate: 10}
+    {description: "Repas complets le 10/06/2026 code session : 0011263-001032-001", quantity: 13, amount: 30, amountKind: "unit_ttc", vatRate: 10},
+    {description: "Repas complets le 11/06/2026 code session : 0012111-001029-001", quantity: 14, amount: 30, amountKind: "unit_ttc", vatRate: 10}
   ]`,
   },
 ]

@@ -2,17 +2,19 @@ import { Type } from '@google/genai'
 import type { PriceMode } from '@/types/invoice'
 
 // Source de verite unique des champs facture envoyes a l'IA.
-// kind = 'string' | 'number' (pour items, ce sont les types primitifs).
+// kind = 'string' | 'number' | 'enum' (enum = liste fermee de valeurs string).
 // Les schemas Gemini et OpenAI sont generes a partir de cette table —
 // ajouter un champ ici le rend disponible pour les deux providers.
-type FieldKind = 'string' | 'number'
-interface FieldSpec { kind: FieldKind; description: string }
+type FieldKind = 'string' | 'number' | 'enum'
+interface FieldSpec { kind: FieldKind; description: string; enumValues?: readonly string[] }
 
-function priceDescription(priceMode: PriceMode): string {
-  return priceMode === 'ttc'
-    ? 'Prix unitaire TTC en euros (tel que donné par l\'utilisateur, NE PAS convertir)'
-    : 'Prix unitaire HT en euros'
-}
+// Nature d'un montant enonce par l'utilisateur. L'IA ne fait JAMAIS de
+// conversion ni de division : elle recopie le montant et le QUALIFIE ici.
+// Tous les calculs (TTC->HT, total->unitaire) sont faits par le code
+// (aiValidation) avec les regles d'arrondi du projet — un LLM qui fait
+// de l'arithmetique est la source des montants fantaisistes.
+export const AMOUNT_KINDS = ['unit_ht', 'unit_ttc', 'total_ht', 'total_ttc'] as const
+export type AmountKind = (typeof AMOUNT_KINDS)[number]
 
 const TOP_LEVEL_FIELDS: Record<string, FieldSpec> = {
   message: { kind: 'string', description: 'Question ou information courte pour l\'utilisateur (ex: liste des données manquantes). Peut accompagner des données partielles. Vide ("") quand les données sont complètes.' },
@@ -33,21 +35,31 @@ const TOP_LEVEL_FIELDS: Record<string, FieldSpec> = {
 }
 
 function itemFields(priceMode: PriceMode): Record<string, FieldSpec> {
+  const defaultKind = priceMode === 'ttc' ? 'unit_ttc' : 'unit_ht'
   return {
     description: { kind: 'string', description: 'Description de la prestation ou du produit' },
     quantity: { kind: 'number', description: 'Quantité' },
-    unitPrice: { kind: 'number', description: priceDescription(priceMode) },
+    amount: { kind: 'number', description: 'Montant en euros TEL QUE DONNÉ par l\'utilisateur, sans AUCUNE conversion ni division' },
+    amountKind: {
+      kind: 'enum',
+      enumValues: AMOUNT_KINDS,
+      description: `Nature du montant : unit_ = prix d'UNE unité, total_ = total de la ligne ; _ht = hors taxes, _ttc = TTC. Si l'utilisateur ne précise ni HT ni TTC : ${defaultKind}`,
+    },
     vatRate: { kind: 'number', description: 'Taux de TVA : 0, 2.1, 5.5, 10 ou 20' },
   }
 }
 
-const ITEM_REQUIRED = ['description', 'quantity', 'unitPrice', 'vatRate']
+const ITEM_REQUIRED = ['description', 'quantity', 'amount', 'amountKind', 'vatRate']
 
 export function buildInvoiceSchema(priceMode: PriceMode) {
-  const geminiType = (k: FieldKind) => k === 'string' ? Type.STRING : Type.NUMBER
+  const geminiType = (k: FieldKind) => k === 'number' ? Type.NUMBER : Type.STRING
   const toProps = (fields: Record<string, FieldSpec>) =>
     Object.fromEntries(
-      Object.entries(fields).map(([name, spec]) => [name, { type: geminiType(spec.kind), description: spec.description }]),
+      Object.entries(fields).map(([name, spec]) => [name, {
+        type: geminiType(spec.kind),
+        description: spec.description,
+        ...(spec.kind === 'enum' ? { enum: [...(spec.enumValues ?? [])] } : {}),
+      }]),
     )
 
   return {
@@ -70,12 +82,16 @@ export function buildInvoiceSchema(priceMode: PriceMode) {
 export function buildOpenAIInvoiceSchema(priceMode: PriceMode) {
   // OpenAI strict mode : tous les champs doivent etre dans 'required',
   // et les champs optionnels sont exprimes via une union avec null.
-  const nullable = (k: FieldKind) => [k, 'null'] as const
+  const jsonType = (k: FieldKind) => k === 'number' ? 'number' : 'string'
   const toProps = (fields: Record<string, FieldSpec>, nullableTypes: boolean) =>
     Object.fromEntries(
       Object.entries(fields).map(([name, spec]) => [
         name,
-        { type: nullableTypes ? nullable(spec.kind) : spec.kind, description: spec.description },
+        {
+          type: nullableTypes ? ([jsonType(spec.kind), 'null'] as const) : jsonType(spec.kind),
+          description: spec.description,
+          ...(spec.kind === 'enum' ? { enum: [...(spec.enumValues ?? [])] } : {}),
+        },
       ]),
     )
   const topLevelKeys = Object.keys(TOP_LEVEL_FIELDS)

@@ -666,6 +666,7 @@ function App() {
               open
               onClose={() => {}}
               onApplyData={handleApplyAIData}
+              priceMode={inv.state.issuer.priceMode ?? "ht"}
             />
           </div>
 
@@ -814,6 +815,7 @@ function App() {
                   open={true}
                   onClose={() => setShowAIChat(false)}
                   onApplyData={handleApplyAIData}
+                  priceMode={inv.state.issuer.priceMode ?? "ht"}
                 />
               </div>
             </div>
