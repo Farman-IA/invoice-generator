@@ -153,7 +153,9 @@ export type PriceMode = 'ht' | 'ttc'
 export type AIProvider = 'google' | 'openai'
 
 export type GoogleModel = 'gemini-2.5-flash' | 'gemini-2.5-pro'
-export type OpenAIModel = 'gpt-4o-mini' | 'gpt-4o'
+// gpt-5.4 / gpt-5.4-mini : generation actuelle (juin 2026), meilleure
+// comprehension des demandes complexes (mails multi-sessions) que gpt-4o.
+export type OpenAIModel = 'gpt-4o-mini' | 'gpt-4o' | 'gpt-5.4-mini' | 'gpt-5.4'
 export type AIModel = GoogleModel | OpenAIModel
 
 export interface AISettings {

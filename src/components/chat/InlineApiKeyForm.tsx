@@ -31,7 +31,7 @@ export function InlineApiKeyForm({ onKeyValidated }: InlineApiKeyFormProps) {
       const current = await storage.getAISettings()
       // Si l'utilisateur change de provider, on réinitialise le modèle au défaut.
       const previousProvider = current?.provider ?? (current?.model?.startsWith('gpt') ? 'openai' : 'google')
-      const defaultModel = inferredProvider === 'openai' ? 'gpt-4o-mini' as const : 'gemini-2.5-flash' as const
+      const defaultModel = inferredProvider === 'openai' ? 'gpt-5.4-mini' as const : 'gemini-2.5-flash' as const
       const newSettings: AISettings = {
         provider: inferredProvider,
         apiKey: trimmed,

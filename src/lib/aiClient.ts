@@ -9,6 +9,22 @@ export function getProvider(settings: Pick<AISettings, 'provider' | 'model'>): A
   return settings.model.startsWith('gpt') ? 'openai' : 'google'
 }
 
+// Nom lisible du modèle, affiché en badge dans l'en-tête du chat pour que
+// l'utilisateur VOIE quel cerveau répond (et détecte un mauvais réglage
+// du genre "je croyais être sur ChatGPT mais c'est Gemini qui tourne").
+const MODEL_LABELS: Record<AIModel, string> = {
+  'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  'gemini-2.5-pro': 'Gemini 2.5 Pro',
+  'gpt-4o-mini': 'GPT-4o mini',
+  'gpt-4o': 'GPT-4o',
+  'gpt-5.4-mini': 'GPT-5.4 mini',
+  'gpt-5.4': 'GPT-5.4',
+}
+
+export function modelLabel(model: AIModel): string {
+  return MODEL_LABELS[model] ?? model
+}
+
 // Retry automatique sur 503 (serveurs surchargés) :
 // jusqu'à 2 nouvelles tentatives (attente 2s puis 4s). Le timeout
 // de 30s s'applique PAR tentative, pas au total.

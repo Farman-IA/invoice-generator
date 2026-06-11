@@ -20,14 +20,16 @@ const MODELS_BY_PROVIDER: Record<AIProvider, { value: AIModel; label: string }[]
     { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (plus précis)' },
   ],
   openai: [
-    { value: 'gpt-4o-mini', label: 'GPT-4o mini (rapide, économique — recommandé)' },
-    { value: 'gpt-4o', label: 'GPT-4o (plus précis, plus cher)' },
+    { value: 'gpt-5.4-mini', label: 'GPT-5.4 mini (rapide, fiable — recommandé)' },
+    { value: 'gpt-5.4', label: 'GPT-5.4 (le plus précis, plus cher)' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o mini (ancienne génération, économique)' },
+    { value: 'gpt-4o', label: 'GPT-4o (ancienne génération)' },
   ],
 }
 
 const DEFAULT_MODEL: Record<AIProvider, AIModel> = {
   google: 'gemini-2.5-flash',
-  openai: 'gpt-4o-mini',
+  openai: 'gpt-5.4-mini',
 }
 
 function inferProvider(settings: { provider?: AIProvider; model: AIModel } | null): AIProvider {
@@ -35,11 +37,6 @@ function inferProvider(settings: { provider?: AIProvider; model: AIModel } | nul
   if (settings?.model?.startsWith('gpt')) return 'openai'
   return 'google'
 }
-
-const PRICE_MODES: { value: PriceMode; label: string; description: string }[] = [
-  { value: 'ht', label: 'HT (hors taxe)', description: 'Les montants dictés sont déjà hors taxe' },
-  { value: 'ttc', label: 'TTC (toutes taxes)', description: 'Les montants dictés incluent la TVA — conversion auto' },
-]
 
 export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) {
   const [provider, setProvider] = useState<AIProvider>('google')
@@ -115,11 +112,6 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
   const handleModelChange = (value: AIModel) => {
     setModel(value)
     save(provider, apiKey, value, priceMode)
-  }
-
-  const handlePriceModeChange = (value: PriceMode) => {
-    setPriceMode(value)
-    save(provider, apiKey, model, value)
   }
 
   const currentProvider = PROVIDERS.find(p => p.value === provider)!
@@ -213,29 +205,10 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
             ))}
           </select>
         </div>
-        <div className="col-span-2">
-          <label id="ai-price-mode" className="text-xs text-gray-500 dark:text-gray-400">Les montants que je dicte sont en</label>
-          <div role="group" aria-labelledby="ai-price-mode" className="flex gap-2 mt-1">
-            {PRICE_MODES.map(mode => (
-              <button
-                key={mode.value}
-                type="button"
-                onClick={() => handlePriceModeChange(mode.value)}
-                aria-pressed={priceMode === mode.value}
-                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                  priceMode === mode.value
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
-            {PRICE_MODES.find(m => m.value === priceMode)?.description}
-          </p>
-        </div>
+        <p className="col-span-2 text-[11px] text-gray-400 dark:text-gray-500">
+          Le mode HT / TTC des montants se règle directement sur la facture
+          (sélecteur en haut du document) — l'assistant IA suit automatiquement.
+        </p>
       </div>
     </div>
   )
