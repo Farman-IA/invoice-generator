@@ -1,16 +1,16 @@
-// Hook qui prend un fichier (PDF ou image) et appelle l'IA pour
-// en extraire des données de facture. Réutilise le prompt système, le schéma
-// et la validation du hook texte (useAIParser) — la seule différence est
-// le canal d'entrée (fichier au lieu de texte tapé).
+// Hook qui prend un fichier (PDF ou image) et appelle l'IA pour en extraire
+// des données de facture. Partage les mêmes briques que le parsing texte
+// (aiPrompt, aiSchemas, et le façonnage du résultat via aiResult) — la seule
+// différence est le canal d'entrée : un fichier au lieu d'un texte tapé.
 
 import { useState, useCallback } from 'react'
 import { GoogleGenAI } from '@google/genai'
 import OpenAI from 'openai'
 import { storage } from '@/lib/storage'
-import { getProvider, callWithRetry, formatError } from '@/lib/aiClient'
+import { getProvider, callWithRetry } from '@/lib/aiClient'
 import { buildInvoiceSchema, buildOpenAIInvoiceSchema } from '@/lib/aiSchemas'
 import { buildSystemPrompt } from '@/lib/aiPrompt'
-import { validateParsedData } from '@/lib/aiValidation'
+import { finalizeAIResponse, toAIErrorResult } from '@/lib/aiResult'
 import {
   validateFile,
   extractPdfText,
@@ -160,21 +160,8 @@ export function useAIFileParser() {
         rawJson = await callGeminiWithFile(settings.apiKey, settings.model, systemPrompt, file, priceMode)
       }
 
-      let raw: Record<string, unknown>
-      try {
-        raw = JSON.parse(rawJson)
-      } catch {
-        return { data: null, message: null, error: 'Réponse IA invalide. Réessayez.', isRetryable: true }
-      }
-
-      // Même contrat que useAIParser : données ET message peuvent coexister
-      // (ex: bon de commande extrait + question sur le prix manquant).
-      const parsed = validateParsedData(raw, priceMode)
-      const aiMessage = raw.message ? String(raw.message).trim() : null
-      if (parsed || aiMessage) {
-        return { data: parsed, message: aiMessage, error: null, isRetryable: false }
-      }
-
+      const result = finalizeAIResponse(rawJson, priceMode)
+      if (result.data || result.message || result.error) return result
       return {
         data: null,
         message: null,
@@ -182,9 +169,7 @@ export function useAIFileParser() {
         isRetryable: false,
       }
     } catch (err) {
-      const errorMsg = formatError(err, provider)
-      const isRetryable = err instanceof Error && /429|rate|quota|network|fetch|failed/i.test(err.message)
-      return { data: null, message: null, error: errorMsg, isRetryable }
+      return toAIErrorResult(err, provider)
     } finally {
       setIsLoading(false)
     }

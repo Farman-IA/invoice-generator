@@ -1,16 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { storage } from '@/lib/storage'
-import { getProvider, callGemini, callOpenAI, formatError } from '@/lib/aiClient'
+import { getProvider, callGemini, callOpenAI, type ChatTurn } from '@/lib/aiClient'
 import { buildSystemPrompt } from '@/lib/aiPrompt'
-import { validateParsedData } from '@/lib/aiValidation'
-import type { AISettings, ParsedInvoiceData, PriceMode } from '@/types/invoice'
+import { finalizeAIResponse, toAIErrorResult, type AIParseResult } from '@/lib/aiResult'
+import type { AISettings, PriceMode } from '@/types/invoice'
 
-export interface AIParseResult {
-  data: ParsedInvoiceData | null
-  message: string | null
-  error: string | null
-  isRetryable: boolean
-}
+// Ré-export pour les composants qui consomment le type via ce hook
+export type { AIParseResult } from '@/lib/aiResult'
 
 export function useAIParser() {
   const [settings, setSettings] = useState<AISettings | null>(null)
@@ -28,7 +24,7 @@ export function useAIParser() {
   // priceModeOverride : le mode HT/TTC de la FACTURE à l'écran (source de
   // vérité unique). Sans lui, on retombe sur le vieux réglage IA — qui
   // pouvait contredire le mode de la facture et fausser les conversions.
-  const parse = useCallback(async (text: string, history: { role: 'user' | 'assistant'; content: string }[] = [], priceModeOverride?: PriceMode): Promise<AIParseResult> => {
+  const parse = useCallback(async (text: string, history: ChatTurn[] = [], priceModeOverride?: PriceMode): Promise<AIParseResult> => {
     const currentSettings = await storage.getAISettings()
     if (currentSettings) setSettings(currentSettings)
 
@@ -54,28 +50,11 @@ export function useAIParser() {
         rawJson = await callGemini(currentSettings.apiKey, currentSettings.model, systemPrompt, recentHistory, text, priceMode)
       }
 
-      let raw: Record<string, unknown>
-      try {
-        raw = JSON.parse(rawJson)
-      } catch {
-        return { data: null, message: null, error: 'Réponse IA invalide. Réessayez.', isRetryable: true }
-      }
-
-      // Données ET message peuvent coexister : l'IA extrait ce qu'elle a
-      // (ex: 4 lignes sans prix) ET pose la question de ce qui manque.
-      // Avant, le message était jeté dès qu'il y avait des données → impossible
-      // de demander une précision à l'utilisateur.
-      const parsed = validateParsedData(raw, priceMode)
-      const aiMessage = raw.message ? String(raw.message).trim() : null
-      if (parsed || aiMessage) {
-        return { data: parsed, message: aiMessage, error: null, isRetryable: false }
-      }
-
+      const result = finalizeAIResponse(rawJson, priceMode)
+      if (result.data || result.message || result.error) return result
       return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null, isRetryable: false }
     } catch (err) {
-      const errorMsg = formatError(err, provider)
-      const isRetryable = err instanceof Error && /429|rate|quota|network|fetch|failed/i.test(err.message)
-      return { data: null, message: null, error: errorMsg, isRetryable }
+      return toAIErrorResult(err, provider)
     } finally {
       setIsLoading(false)
     }

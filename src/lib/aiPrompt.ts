@@ -25,12 +25,13 @@ L'utilisateur donne souvent les informations en PLUSIEURS messages (ex: un mail 
 - Message 2 : "cap competences 30 euros ttc par personne"
 - → Réponse au message 2 : le client CAP COMPETENCES ET les 2 lignes complètes (quantités 13 et 14, dates, codes session, prix).
 Ne perds JAMAIS les quantités, dates, références ou noms donnés dans les messages précédents.
+Tes propres réponses dans l'historique récapitulent ce que tu as déjà proposé : pars de cette base et mets-la à jour — ne crée JAMAIS de doublon d'une ligne déjà proposée.
 Seule exception : une demande de modification ciblée d'une facture déjà appliquée (voir section MODIFICATIONS).
 
 ## Quand le texte contient des données de facture :
 Extrait : clientName, clientDepartment (si un service/département est mentionné), clientAddress (si mentionnée), clientAddressLine2 (si l'adresse a une 2e ligne : Tour, BP, Case courrier, bâtiment, étage), clientPostalCode (si mentionné), clientCity (si mentionnée), clientSiret (si un n° SIRET de 14 chiffres est donné), clientSiren (si un n° SIREN de 9 chiffres est donné), clientTvaNumber (si un n° de TVA intracommunautaire est donné), contactName (si mentionné), purchaseOrder (si mentionné), codeService (si mentionné, voir section Chorus Pro), notes (si mentionnées), et la liste des items (description, quantity, amount, amountKind, vatRate).
 N'extrais le SIRET/SIREN/TVA QUE s'ils sont explicitement écrits dans le texte. Ne les invente JAMAIS : pour un client connu, ces numéros sont récupérés automatiquement depuis le carnet.
-Mets message à "" (vide).
+Mets message à "" (vide) UNIQUEMENT quand toutes les informations nécessaires sont présentes (client, lignes, prix). S'il manque quelque chose, applique la section "Données incomplètes" ci-dessous : données extraites ET question dans message.
 
 ${priceInstruction}
 

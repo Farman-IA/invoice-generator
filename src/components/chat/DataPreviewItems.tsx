@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VAT_RATES } from '@/lib/constants'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
-import { getEffectiveUnitPriceHT, mergeLineItem, round2 } from '@/lib/money'
+import { getEffectiveUnitPriceHT, getEffectiveUnitPriceTTC, mergeLineItem, round2 } from '@/lib/money'
 import type { ParsedInvoiceData, PriceMode, VatRate } from '@/types/invoice'
 
 type PreviewItem = ParsedInvoiceData['items'][number]
@@ -14,6 +15,40 @@ interface DataPreviewItemsProps {
 }
 
 const inputCls = 'px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-100'
+
+// Saisie numérique "brouillon" : l'utilisateur tape librement (champ vide,
+// virgule, décimales en cours de frappe) et la valeur n'est validée qu'à la
+// sortie du champ — même principe que InlineEdit du tableau principal.
+// Un input contrôlé qui arrondit à CHAQUE frappe rend "27,50" intapable
+// (le séparateur décimal est mangé avant la frappe suivante).
+function DraftNumberInput({ value, onCommit, integer = false, ...inputProps }: {
+  value: number
+  onCommit: (parsed: number) => void
+  integer?: boolean
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur' | 'type'>) {
+  const [draft, setDraft] = useState<string | null>(null)
+  // 0 s'affiche vide : un champ neuf invite à taper, pas à effacer un "0"
+  const shown = draft ?? (value === 0 ? '' : String(value))
+
+  const commit = () => {
+    if (draft === null) return
+    const parsed = Number(draft.replace(',', '.'))
+    onCommit(Number.isFinite(parsed) ? parsed : 0)
+    setDraft(null)
+  }
+
+  return (
+    <input
+      {...inputProps}
+      type="text"
+      inputMode={integer ? 'numeric' : 'decimal'}
+      value={shown}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+    />
+  )
+}
 
 // Une ligne saisie en TTC s'édite en TTC (le TTC énoncé est la source de
 // vérité), une ligne HT s'édite en HT. Le montant complémentaire est
@@ -76,61 +111,61 @@ export function DataPreviewItems({ items, priceMode, onChange }: DataPreviewItem
         const shownPrice = ttcMode ? item.unitPriceTTC! : item.unitPrice
         const counterpart = ttcMode
           ? `= ${formatEuro(item.unitPrice)} € HT`
-          : `= ${formatEuro(round2(item.unitPrice * (1 + item.vatRate / 100)))} € TTC`
+          : `= ${formatEuro(getEffectiveUnitPriceTTC(item.unitPrice, item.vatRate))} € TTC`
         return (
           <div key={i} className="rounded border border-gray-200 dark:border-gray-700 p-1.5 space-y-1">
             <div className="flex gap-1">
-              <input
-                type="number"
+              <DraftNumberInput
                 value={item.quantity}
-                onChange={e => update(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
+                onCommit={v => update(i, { quantity: Math.max(1, Math.round(v) || 1) })}
+                integer
                 className={`w-12 text-center ${inputCls}`}
-                min="1"
-                aria-label="Quantité"
+                aria-label={`Quantité — ligne ${i + 1}`}
               />
               <input
                 value={item.description}
                 onChange={e => update(i, { description: e.target.value })}
-                className={`flex-1 ${inputCls}`}
+                className={`flex-1 min-w-0 ${inputCls}`}
                 placeholder="Description"
+                aria-label={`Description — ligne ${i + 1}`}
               />
               <Button
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => removeLine(i)}
-                aria-label="Supprimer la ligne"
+                aria-label={`Supprimer la ligne ${i + 1}`}
                 className="text-gray-400 hover:text-red-500 shrink-0"
               >
                 <Trash2 className="size-3" />
               </Button>
             </div>
             <div className="flex gap-1 items-center">
-              <input
-                type="number"
+              <DraftNumberInput
                 value={shownPrice}
-                onChange={e => updatePrice(i, Number(e.target.value))}
+                onCommit={v => updatePrice(i, v)}
                 className={`w-20 text-right ${inputCls}`}
-                step="0.01"
-                min="0"
-                aria-label={ttcMode ? 'Prix unitaire TTC' : 'Prix unitaire HT'}
+                placeholder="0,00"
+                aria-label={`${ttcMode ? 'Prix unitaire TTC' : 'Prix unitaire HT'} — ligne ${i + 1}`}
               />
-              <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+              <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 shrink-0">
                 € {ttcMode ? 'TTC' : 'HT'}
               </span>
               <select
                 value={item.vatRate}
                 onChange={e => updateVat(i, Number(e.target.value) as VatRate)}
-                className={inputCls}
-                aria-label="Taux de TVA"
+                className={`flex-1 min-w-0 ${inputCls}`}
+                aria-label={`Taux de TVA — ligne ${i + 1}`}
               >
                 {VAT_RATES.map(r => (
-                  <option key={r.value} value={r.value}>TVA {r.label}</option>
+                  <option key={r.value} value={r.value}>{r.label} — {r.description}</option>
                 ))}
               </select>
-              <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-auto">
-                {counterpart}
-              </span>
             </div>
+            {/* Conversion affichée sur sa propre ligne : dans le panneau de
+                320px, la caser à droite du select la faisait déborder. */}
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 text-right" aria-live="polite">
+              {counterpart} (TVA {item.vatRate} %)
+            </p>
           </div>
         )
       })}

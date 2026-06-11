@@ -63,3 +63,36 @@ clôture (idéalement chiffré ou conditionné à un événement).
   déjà livrées. Le reste est du confort, pas de la sûreté.
 - **Critère de clôture** : à reprendre si la feature backup devient un usage
   régulier (export/import fréquent) ou si un retour utilisateur le réclame.
+
+### 2026-06-11 — Suggestions différées de l'audit "refonte assistant IA"
+- **Périmètre** (suggestions /review-code non bloquantes — les 2 BLOCKING et
+  les CRITICAL de l'audit ont été corrigés dans la session) :
+  - **Envoyer l'état réel de la facture à l'IA à chaque tour** (chantier
+    "1b") : aujourd'hui l'IA ne connaît que la conversation, pas ce qui est
+    réellement appliqué sur la facture (modifs manuelles incluses). C'est le
+    correctif structurel définitif contre les doublons/dérives multi-tours ;
+    la parade actuelle est une consigne anti-duplication dans le prompt.
+  - **Confort tactile de l'aperçu IA** : cibles tactiles < 44px (suppression
+    de ligne, select TVA), pas d'annulation après suppression d'une ligne
+    (piste : toast sonner avec "Annuler").
+  - **`displayParseResult` fait 3 métiers** (useChatConversation.ts) :
+    construction du message, règle "content = historique IA", planification
+    du backoff — à scinder au prochain passage.
+  - **Règle "TTC placeholder à 0" encodée 2 fois** (DataPreview.handleApply
+    et DataPreviewItems totaux) — extraire un normaliseur partagé.
+  - **`mergeClientFromAI` recopie le carnet via `Object.entries`** sans
+    liste blanche de clés (applyAIData.ts) : un futur champ interne de
+    `ClientRecord` fuirait silencieusement dans la facture. Faire comme
+    `LINE_ITEM_ALLOWED_KEYS`.
+  - **`AISettingsSection.tsx` à 215 lignes** (au-dessus de la règle des
+    200 ; était à 242 avant la session) : extraire le champ "clé API +
+    validation visuelle" dans un sous-composant.
+  - **Dérivation HT→TTC encore en dur** dans `App.tsx` (handleInsertTemplate)
+    et `LineItemsTable.tsx` : migrer vers `getEffectiveUnitPriceTTC`
+    (les occurrences NOUVELLES de la session utilisent déjà le helper).
+- **Raison du report** : fin de session déjà dense (5 chantiers + audit +
+  correctifs bloquants) ; ces points sont du confort/durcissement, pas de la
+  sûreté monétaire.
+- **Critère de clôture** : "1b" à traiter si un doublon de ligne multi-tours
+  est observé en usage réel ; le reste au prochain passage sur les fichiers
+  concernés.

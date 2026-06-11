@@ -100,6 +100,17 @@ export function getEffectiveUnitPriceHT(
 }
 
 /**
+ * Prix TTC effectif dérivé d'un prix HT (pour l'affichage d'une ligne
+ * saisie en HT). Pendant de getEffectiveUnitPriceHT : centralise la règle
+ * d'arrondi HT→TTC au lieu de disperser `round2(ht × (1 + t/100))` dans
+ * l'UI — une règle monétaire éparpillée finit toujours par diverger.
+ */
+export function getEffectiveUnitPriceTTC(unitPrice: number, vatRate: number): number {
+  if (!isValidVatRate(vatRate)) return round2(unitPrice)
+  return round2(unitPrice * (1 + vatRate / 100))
+}
+
+/**
  * Migration au chargement : normalise un LineItem brut chargé depuis le
  * storage en arrondissant unitPrice et unitPriceTTC à 2 décimales.
  *

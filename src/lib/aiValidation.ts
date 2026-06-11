@@ -82,13 +82,28 @@ export function validateParsedData(raw: Record<string, unknown>, priceMode: Pric
           const rawAmount = Math.max(0, Number(item.amount ?? item.unitPrice) || 0)
 
           // 1) Ramener au prix UNITAIRE — c'est le code qui divise, jamais l'IA.
-          //    NB : un total qui ne tombe pas juste au centime près par unité
-          //    (ex: 100 € TTC pour 3) garde une dérive d'un centime sur le
-          //    total recalculé : fait mathématique, documenté dans la fiche
-          //    CAP COMPETENCES (solution métier = ligne consolidée qty 1).
-          const unitAmount = amountKind.startsWith('total_')
-            ? round2(rawAmount / quantity)
-            : round2(rawAmount)
+          //    Si le total ne se divise pas EXACTEMENT au centime près
+          //    (ex: 100 € pour 3), on CONSOLIDE en 1 ligne avec la quantité
+          //    reportée dans la description : le total énoncé par l'utilisateur
+          //    est sacré, on ne le laisse jamais dériver de quelques centimes
+          //    (invariant n°5 — c'est le "plan B" métier de la fiche
+          //    CAP COMPETENCES, appliqué automatiquement).
+          let finalDescription = description
+          let finalQuantity = quantity
+          let unitAmount: number
+          if (amountKind.startsWith('total_')) {
+            const total = round2(rawAmount)
+            const perUnit = round2(total / quantity)
+            if (quantity > 1 && round2(perUnit * quantity) !== total) {
+              finalDescription = `${quantity} × ${description}`
+              finalQuantity = 1
+              unitAmount = total
+            } else {
+              unitAmount = perUnit
+            }
+          } else {
+            unitAmount = round2(rawAmount)
+          }
 
           // 2) Conversion fiscale. Un montant énoncé TTC est SACRÉ : on le
           //    conserve dans unitPriceTTC quel que soit le mode global, pour
@@ -96,14 +111,14 @@ export function validateParsedData(raw: Record<string, unknown>, priceMode: Pric
           //    (13 repas × 30 € TTC = 390,00 € pile, pas 389,96).
           if (amountKind.endsWith('_ttc')) {
             return {
-              description,
-              quantity,
+              description: finalDescription,
+              quantity: finalQuantity,
               unitPrice: convertTtcToHt(unitAmount, vatRate),
               unitPriceTTC: unitAmount,
               vatRate,
             }
           }
-          return { description, quantity, unitPrice: unitAmount, vatRate }
+          return { description: finalDescription, quantity: finalQuantity, unitPrice: unitAmount, vatRate }
         })
     : []
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAIParser, type AIParseResult } from '@/hooks/useAIParser'
 import { useAIFileParser } from '@/hooks/useAIFileParser'
 import { formatAppliedData } from '@/lib/formatAppliedData'
+import type { ChatTurn } from '@/lib/aiClient'
 import type { ChatMessage } from '@/components/chat/ChatMessages'
 import type { PriceMode } from '@/types/invoice'
 
@@ -67,9 +68,9 @@ export function useChatConversation(priceMode?: PriceMode) {
     lastUserTextRef.current = text
     addMessage({ role: 'user', content: text })
     // Historique transmis à l'IA comme vrais tours de conversation (sans les erreurs)
-    const history = messages
+    const history: ChatTurn[] = messages
       .filter(m => m.role !== 'error')
-      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+      .map(m => ({ role: m.role as ChatTurn['role'], content: m.content }))
     const result = await parse(text, history, priceMode)
     displayParseResult(result, { enableRetry: true })
   }

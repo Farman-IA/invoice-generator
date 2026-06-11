@@ -1,7 +1,7 @@
 // Helpers de transformation des donnees retournees par l'IA en mises a jour
 // pour la facture courante. Extrait de App.tsx pour rester testable et lisible.
 
-import { round2 } from '@/lib/money'
+import { getEffectiveUnitPriceTTC, round2 } from '@/lib/money'
 import type {
   ClientInfo,
   ClientRecord,
@@ -115,7 +115,7 @@ export function buildItemsFromAI(
     }
     // Mode TTC sans TTC énoncé : on dérive pour que la colonne TTC soit remplie.
     if (priceMode === 'ttc') {
-      return { ...base, unitPriceTTC: round2(item.unitPrice * (1 + item.vatRate / 100)) }
+      return { ...base, unitPriceTTC: getEffectiveUnitPriceTTC(item.unitPrice, item.vatRate) }
     }
     return base
   })

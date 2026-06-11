@@ -23,16 +23,42 @@ describe('validateParsedData — montants amount/amountKind', () => {
     expect(result?.items[0].unitPriceTTC).toBe(30)
   })
 
-  it('total_ht : divise par la quantité côté code', () => {
-    const result = validateParsedData(item({ quantity: 5, amount: 154.82, amountKind: 'total_ht' }), 'ht')
-    expect(result?.items[0].unitPrice).toBe(30.96)
+  it('total_ht divisible au centime : divise par la quantité côté code', () => {
+    const result = validateParsedData(item({ quantity: 4, amount: 100, amountKind: 'total_ht' }), 'ht')
+    expect(result?.items[0].unitPrice).toBe(25)
+    expect(result?.items[0].quantity).toBe(4)
     expect(result?.items[0].unitPriceTTC).toBeUndefined()
+  })
+
+  it('total_ht NON divisible au centime (154,82 / 5) : consolide pour que le total énoncé ne dérive pas', () => {
+    // 154,82 / 5 = 30,964 → arrondi 30,96 → × 5 = 154,80 : 2 centimes perdus.
+    // La consolidation garde le total exact dicté par l'utilisateur.
+    const result = validateParsedData(item({ quantity: 5, amount: 154.82, amountKind: 'total_ht' }), 'ht')
+    expect(result?.items[0].quantity).toBe(1)
+    expect(result?.items[0].unitPrice).toBe(154.82)
+    expect(result?.items[0].description).toBe('5 × Repas')
   })
 
   it('total_ttc : divise puis conserve le TTC unitaire', () => {
     const result = validateParsedData(item({ quantity: 4, amount: 100, amountKind: 'total_ttc', vatRate: 10 }), 'ht')
     expect(result?.items[0].unitPriceTTC).toBe(25)
     expect(result?.items[0].unitPrice).toBe(22.73)
+  })
+
+  it('total_ttc NON divisible au centime : consolide en 1 ligne, le total énoncé ne dérive jamais', () => {
+    // 100 € TTC pour 3 : 33,33 × 3 = 99,99 ≠ 100 → consolidation automatique
+    // (le plan B métier de la fiche CAP COMPETENCES, appliqué par le code)
+    const result = validateParsedData(item({ quantity: 3, amount: 100, amountKind: 'total_ttc', vatRate: 10 }), 'ht')
+    expect(result?.items[0].quantity).toBe(1)
+    expect(result?.items[0].unitPriceTTC).toBe(100)
+    expect(result?.items[0].description).toBe('3 × Repas')
+  })
+
+  it('total_ht NON divisible : même consolidation', () => {
+    const result = validateParsedData(item({ quantity: 3, amount: 100, amountKind: 'total_ht' }), 'ht')
+    expect(result?.items[0].quantity).toBe(1)
+    expect(result?.items[0].unitPrice).toBe(100)
+    expect(result?.items[0].description).toBe('3 × Repas')
   })
 
   it('amountKind manquant : défaut unit_ttc en mode TTC, unit_ht en mode HT', () => {
@@ -48,6 +74,15 @@ describe('validateParsedData — montants amount/amountKind', () => {
       { clientName: 'X', items: [{ description: 'Repas', quantity: 2, unitPrice: 30, vatRate: 10 }] },
       'ht',
     )
+    expect(result?.items[0].unitPrice).toBe(30)
+  })
+
+  it('rétro-compat en mode TTC : unitPrice legacy traité comme TTC (comme l\'ancien contrat)', () => {
+    const result = validateParsedData(
+      { clientName: 'X', items: [{ description: 'Repas', quantity: 2, unitPrice: 33, vatRate: 10 }] },
+      'ttc',
+    )
+    expect(result?.items[0].unitPriceTTC).toBe(33)
     expect(result?.items[0].unitPrice).toBe(30)
   })
 })

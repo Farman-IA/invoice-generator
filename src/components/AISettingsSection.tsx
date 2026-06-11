@@ -3,7 +3,7 @@ import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { storage } from '@/lib/storage'
 import { validateApiKey } from '@/lib/aiKeyValidation'
-import type { AISettings, AIProvider, AIModel, PriceMode } from '@/types/invoice'
+import type { AISettings, AIProvider, AIModel } from '@/types/invoice'
 
 interface AISettingsSectionProps {
   onSettingsChange?: (settings: AISettings) => void
@@ -42,7 +42,6 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
   const [provider, setProvider] = useState<AIProvider>('google')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState<AIModel>('gemini-2.5-flash')
-  const [priceMode, setPriceMode] = useState<PriceMode>('ht')
   const [showKey, setShowKey] = useState(false)
   const [validating, setValidating] = useState(false)
   const [keyValid, setKeyValid] = useState<boolean | null>(null)
@@ -56,20 +55,23 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
         setProvider(inferred)
         setApiKey(settings.apiKey)
         setModel(settings.model)
-        setPriceMode(settings.priceMode ?? 'ht')
         setKeyValid(settings.apiKeyValid ?? null)
         prevKeyRef.current = settings.apiKey
       }
     })
   }, [])
 
-  const save = (prov: AIProvider, key: string, mod: AIModel, price: PriceMode, valid?: boolean) => {
+  const save = async (prov: AIProvider, key: string, mod: AIModel, valid?: boolean) => {
+    // priceMode est préservé tel quel depuis le storage (champ legacy) :
+    // depuis juin 2026 le mode actif vient du sélecteur HT/TTC de la facture,
+    // cet écran ne le contrôle plus.
+    const current = await storage.getAISettings()
     const newSettings: AISettings = {
       provider: prov,
       apiKey: key,
       apiKeyValid: valid ?? keyValid ?? undefined,
       model: mod,
-      priceMode: price,
+      priceMode: current?.priceMode ?? 'ht',
     }
     storage.saveAISettings(newSettings)
     onSettingsChange?.(newSettings)
@@ -80,12 +82,12 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
     if (!trimmed) {
       setKeyValid(null)
       setValidationError(null)
-      save(provider, trimmed, model, priceMode, undefined)
+      save(provider, trimmed, model, undefined)
       prevKeyRef.current = trimmed
       return
     }
     if (trimmed === prevKeyRef.current && keyValid !== null) {
-      save(provider, trimmed, model, priceMode, keyValid)
+      save(provider, trimmed, model, keyValid)
       return
     }
     setValidating(true)
@@ -94,7 +96,7 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
     setKeyValid(result.isValid)
     setValidationError(result.error)
     setValidating(false)
-    save(provider, trimmed, model, priceMode, result.isValid)
+    save(provider, trimmed, model, result.isValid)
     prevKeyRef.current = trimmed
   }
 
@@ -106,12 +108,12 @@ export function AISettingsSection({ onSettingsChange }: AISettingsSectionProps) 
     setModel(newModel)
     setKeyValid(null)
     setValidationError(null)
-    save(value, apiKey, newModel, priceMode, undefined)
+    save(value, apiKey, newModel, undefined)
   }
 
   const handleModelChange = (value: AIModel) => {
     setModel(value)
-    save(provider, apiKey, value, priceMode)
+    save(provider, apiKey, value)
   }
 
   const currentProvider = PROVIDERS.find(p => p.value === provider)!
