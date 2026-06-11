@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Sparkles, Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataPreview } from './DataPreview'
-import type { ParsedInvoiceData } from '@/types/invoice'
+import type { ParsedInvoiceData, PriceMode } from '@/types/invoice'
 
 export interface ChatMessage {
   id: string
@@ -20,6 +20,7 @@ interface ChatMessagesProps {
   messages: ChatMessage[]
   isLoading: boolean
   retryCountdown: number
+  priceMode?: PriceMode
   onRetry: () => void
   onApplyPendingData: (msgId: string, edited: ParsedInvoiceData) => void
   onCancelPending: (msgId: string) => void
@@ -32,6 +33,7 @@ export function ChatMessages({
   messages,
   isLoading,
   retryCountdown,
+  priceMode,
   onRetry,
   onApplyPendingData,
   onCancelPending,
@@ -79,6 +81,7 @@ export function ChatMessages({
                   )}
                   <DataPreview
                     data={msg.pendingData}
+                    priceMode={priceMode}
                     onApply={(edited) => onApplyPendingData(msg.id, edited)}
                     onCancel={() => onCancelPending(msg.id)}
                   />

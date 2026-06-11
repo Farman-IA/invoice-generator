@@ -181,6 +181,7 @@ export function AIChatPanel({ open, onClose, onApplyData, priceMode }: AIChatPan
         messages={messages}
         isLoading={isLoading}
         retryCountdown={retryCountdown}
+        priceMode={priceMode}
         onRetry={handleRetry}
         onApplyPendingData={handleApplyPendingData}
         onCancelPending={handleCancelPending}
