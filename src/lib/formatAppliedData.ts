@@ -20,7 +20,14 @@ export function formatAppliedData(data: ParsedInvoiceData): string {
   if (data.codeService) lines.push(`Code service (Chorus Pro) : ${data.codeService}`)
   if (data.items?.length) {
     data.items.forEach(item => {
-      lines.push(`+ ${item.quantity} × ${item.description} — ${item.unitPrice.toFixed(2)}€ HT — TVA ${item.vatRate}%`)
+      // Une ligne saisie en TTC s'affiche en TTC : l'utilisateur dicte
+      // "30 € TTC", il doit relire "30,00€ TTC" — pas le HT dérivé (27,27)
+      // qui faisait croire à un montant inventé. Le HT reste visible sur
+      // la facture elle-même.
+      const price = item.unitPriceTTC != null
+        ? `${item.unitPriceTTC.toFixed(2)}€ TTC`
+        : `${item.unitPrice.toFixed(2)}€ HT`
+      lines.push(`+ ${item.quantity} × ${item.description} — ${price} — TVA ${item.vatRate}%`)
     })
   }
   if (data.deposit != null && data.deposit > 0) lines.push(`Acompte à déduire : ${data.deposit.toFixed(2)}€`)
