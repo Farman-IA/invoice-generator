@@ -35,13 +35,33 @@ export async function callWithRetry<T>(
   }
 }
 
-export async function callGemini(apiKey: string, model: AIModel, prompt: string, priceMode: PriceMode): Promise<string> {
+// Un tour de la conversation du chat (question de l'utilisateur ou réponse
+// de l'assistant). Transmis aux IA comme de VRAIS messages séparés — pas
+// collé en bloc dans le prompt système — pour qu'elles suivent le fil et
+// fusionnent les infos données en plusieurs fois (quantités au message 1,
+// prix au message 2...).
+export interface ChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export async function callGemini(apiKey: string, model: AIModel, systemPrompt: string, history: ChatTurn[], userText: string, priceMode: PriceMode): Promise<string> {
   const ai = new GoogleGenAI({ apiKey })
+  // Gemini nomme le rôle assistant "model" — même structure que le parsing
+  // de fichiers (useAIFileParser) qui utilise déjà systemInstruction.
+  const contents = [
+    ...history.map(turn => ({
+      role: turn.role === 'assistant' ? ('model' as const) : ('user' as const),
+      parts: [{ text: turn.content }],
+    })),
+    { role: 'user' as const, parts: [{ text: userText }] },
+  ]
   const response = await callWithRetry(
     () => ai.models.generateContent({
       model,
-      contents: prompt,
+      contents,
       config: {
+        systemInstruction: systemPrompt,
         responseMimeType: 'application/json',
         responseSchema: buildInvoiceSchema(priceMode),
       },
@@ -51,13 +71,14 @@ export async function callGemini(apiKey: string, model: AIModel, prompt: string,
   return response.text ?? '{}'
 }
 
-export async function callOpenAI(apiKey: string, model: AIModel, systemPrompt: string, userText: string, priceMode: PriceMode): Promise<string> {
+export async function callOpenAI(apiKey: string, model: AIModel, systemPrompt: string, history: ChatTurn[], userText: string, priceMode: PriceMode): Promise<string> {
   const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
   const response = await callWithRetry(
     () => openai.chat.completions.create({
       model,
       messages: [
         { role: 'system', content: systemPrompt },
+        ...history.map(turn => ({ role: turn.role, content: turn.content })),
         { role: 'user', content: userText },
       ],
       response_format: {

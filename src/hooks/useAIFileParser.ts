@@ -165,15 +165,12 @@ export function useAIFileParser() {
         return { data: null, message: null, error: 'Réponse IA invalide. Réessayez.', isRetryable: true }
       }
 
-      // Priorité aux données structurées de facture
+      // Même contrat que useAIParser : données ET message peuvent coexister
+      // (ex: bon de commande extrait + question sur le prix manquant).
       const parsed = validateParsedData(raw, priceMode)
-      if (parsed) {
-        return { data: parsed, message: null, error: null, isRetryable: false }
-      }
-
       const aiMessage = raw.message ? String(raw.message).trim() : null
-      if (aiMessage) {
-        return { data: null, message: aiMessage, error: null, isRetryable: false }
+      if (parsed || aiMessage) {
+        return { data: parsed, message: aiMessage, error: null, isRetryable: false }
       }
 
       return {

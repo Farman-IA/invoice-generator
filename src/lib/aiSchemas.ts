@@ -15,7 +15,7 @@ function priceDescription(priceMode: PriceMode): string {
 }
 
 const TOP_LEVEL_FIELDS: Record<string, FieldSpec> = {
-  message: { kind: 'string', description: 'Message conversationnel quand le texte ne contient pas de données de facture' },
+  message: { kind: 'string', description: 'Question ou information courte pour l\'utilisateur (ex: liste des données manquantes). Peut accompagner des données partielles. Vide ("") quand les données sont complètes.' },
   clientName: { kind: 'string', description: 'Nom du client ou de l\'entreprise' },
   clientDepartment: { kind: 'string', description: 'Service ou département destinataire chez le client (ex: "Factures Fournisseurs DCFG" pour Allianz Vie)' },
   clientAddress: { kind: 'string', description: 'Adresse du client (rue)' },

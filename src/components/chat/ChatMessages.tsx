@@ -10,6 +10,10 @@ export interface ChatMessage {
   content: string
   isRetryable?: boolean
   pendingData?: ParsedInvoiceData
+  // Question ou remarque de l'IA qui ACCOMPAGNE des données partielles
+  // (ex: "Il me manque le prix par déjeuner") — affichée au-dessus du
+  // formulaire de vérification tant que les données ne sont pas appliquées.
+  aiNote?: string
 }
 
 interface ChatMessagesProps {
@@ -67,7 +71,12 @@ export function ChatMessages({
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {/* Données en attente de validation → afficher le formulaire */}
               {msg.pendingData ? (
-                <div className="max-w-[95%]">
+                <div className="max-w-[95%] space-y-2">
+                  {msg.aiNote && (
+                    <div className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl px-3 py-2 text-sm whitespace-pre-line">
+                      {msg.aiNote}
+                    </div>
+                  )}
                   <DataPreview
                     data={msg.pendingData}
                     onApply={(edited) => onApplyPendingData(msg.id, edited)}

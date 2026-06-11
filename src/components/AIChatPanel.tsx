@@ -73,13 +73,19 @@ export function AIChatPanel({ open, onClose, onApplyData }: AIChatPanelProps) {
   // enableRetry : si true, déclenche le countdown de réessai automatique pour les erreurs réseau.
   // Pour le fichier on le laisse à false : l'utilisateur doit re-cliquer sur le trombone.
   const displayParseResult = (result: AIParseResult, { enableRetry }: { enableRetry: boolean }) => {
-    if (result.data) {
+    const parsedData = result.data
+    if (parsedData) {
       retryAttemptRef.current = 0
+      const summary = formatAppliedData(parsedData)
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: formatAppliedData(result.data!),
-        pendingData: result.data!,
+        // content sert d'historique à l'IA au tour suivant : il doit garder
+        // la trace de sa question ET des données déjà extraites, sinon elle
+        // "oublie" ce qu'elle a proposé quand l'utilisateur lui répond.
+        content: result.message ? `${result.message}\n${summary}` : summary,
+        aiNote: result.message ?? undefined,
+        pendingData: parsedData,
       }])
     } else if (result.message) {
       retryAttemptRef.current = 0

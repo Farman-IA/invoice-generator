@@ -40,23 +40,15 @@ export function useAIParser() {
       const priceMode = currentSettings.priceMode ?? 'ht'
       const systemPrompt = buildSystemPrompt(priceMode)
 
-      // Historique conversationnel injecté dans le prompt système
-      let extendedSystem = systemPrompt
-      if (history.length > 0) {
-        const recentHistory = history.slice(-10)
-        const contextLines = recentHistory.map(m =>
-          m.role === 'user' ? `Utilisateur : ${m.content}` : `Assistant : ${m.content}`
-        )
-        extendedSystem += `\n\n## Historique de la conversation :\n${contextLines.join('\n')}`
-      }
+      // L'historique part comme de vrais tours de conversation (10 derniers),
+      // pour que l'IA fusionne les infos données en plusieurs messages.
+      const recentHistory = history.slice(-10)
 
       let rawJson: string
       if (provider === 'openai') {
-        rawJson = await callOpenAI(currentSettings.apiKey, currentSettings.model, extendedSystem, text, priceMode)
+        rawJson = await callOpenAI(currentSettings.apiKey, currentSettings.model, systemPrompt, recentHistory, text, priceMode)
       } else {
-        // Gemini : on garde la concaténation prompt + nouveau message comme avant
-        const prompt = `${extendedSystem}\n\nNouveau message :\n${text}`
-        rawJson = await callGemini(currentSettings.apiKey, currentSettings.model, prompt, priceMode)
+        rawJson = await callGemini(currentSettings.apiKey, currentSettings.model, systemPrompt, recentHistory, text, priceMode)
       }
 
       let raw: Record<string, unknown>
@@ -66,16 +58,14 @@ export function useAIParser() {
         return { data: null, message: null, error: 'Réponse IA invalide. Réessayez.', isRetryable: true }
       }
 
-      // Priorité : extraire les données de facture AVANT le message conversationnel
+      // Données ET message peuvent coexister : l'IA extrait ce qu'elle a
+      // (ex: 4 lignes sans prix) ET pose la question de ce qui manque.
+      // Avant, le message était jeté dès qu'il y avait des données → impossible
+      // de demander une précision à l'utilisateur.
       const parsed = validateParsedData(raw, priceMode)
-      if (parsed) {
-        return { data: parsed, message: null, error: null, isRetryable: false }
-      }
-
-      // Sinon, vérifier le message conversationnel
       const aiMessage = raw.message ? String(raw.message).trim() : null
-      if (aiMessage) {
-        return { data: null, message: aiMessage, error: null, isRetryable: false }
+      if (parsed || aiMessage) {
+        return { data: parsed, message: aiMessage, error: null, isRetryable: false }
       }
 
       return { data: null, message: 'Je n\'ai pas trouvé de données de facture. Décrivez votre facture avec le nom du client et les prestations. Exemple : « Facture pour Société X, 3 repas à 30€ »', error: null, isRetryable: false }
