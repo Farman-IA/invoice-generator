@@ -634,6 +634,7 @@ function App() {
             onDownload={handleGalleryDownload}
             onMarkPaid={inv.markAsPaid}
             onMarkUnpaid={inv.markAsUnpaid}
+            onCorrectDates={inv.correctInvoiceDates}
           />
         </div>
       )}

@@ -4,6 +4,7 @@ import type {
   IssuerProfile,
   ClientInfo,
   InvoiceData,
+  InvoiceDateFields,
   InvoiceState,
   LineItem,
   SavedInvoice,
@@ -216,6 +217,11 @@ export function useInvoice() {
       const now = new Date().toISOString()
       const current = stateRef.current
       const invoiceId = currentInvoiceIdRef.current
+      // Ne JAMAIS réécrire une facture finalisée depuis le formulaire (même
+      // garde que l'auto-save). Sinon cette sauvegarde de secours écraserait
+      // une correction de dates par le contenu périmé du formulaire (encore
+      // chargé avec les anciennes dates au moment de la correction).
+      if (invoiceId && savedInvoicesRef.current.find(i => i.id === invoiceId)?.status === 'finalisée') return
       let updated: SavedInvoice[]
       if (invoiceId) {
         updated = savedInvoicesRef.current.map(inv =>
@@ -593,6 +599,80 @@ export function useInvoice() {
     toast.success('Statut de paiement réinitialisé')
   }, [])
 
+  // Corriger UNIQUEMENT les dates d'une facture finalisée (émission,
+  // livraison, échéance). Besoin opérationnel réel : une date erronée repérée
+  // AVANT transmission au client (incident FAC-2026-140/141 du 12/06/2026,
+  // corrigé jusque-là à la main dans le localStorage).
+  // Périmètre verrouillé PAR CONSTRUCTION : on recopie toute la facture et on
+  // n'écrase que les 3 dates → montants, lignes, numéro et client restent
+  // intacts. Aucun montant n'est touché (respect des invariants monétaires).
+  const correctInvoiceDates = useCallback(async (id: string, dates: InvoiceDateFields) => {
+    // Validation à la frontière du moteur : ne JAMAIS écrire une date vide ou
+    // mal formée sur une facture finalisée (document légal). Le bouton de la
+    // fenêtre bloque déjà ces cas, mais un appelant programmatique (l'assistant
+    // IA pilote ce hook) court-circuiterait cette garde d'interface. Format
+    // attendu : AAAA-MM-JJ. La livraison peut rester vide (optionnelle).
+    const isIso = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+    if (!isIso(dates.issueDate) || !isIso(dates.dueDate) || (dates.deliveryDate !== '' && !isIso(dates.deliveryDate))) {
+      toast.error('Dates invalides')
+      return
+    }
+
+    const today = getLocalDate()
+    const updated = savedInvoicesRef.current.map(inv => {
+      // Garde-fou : on ne corrige que des factures finalisées (un brouillon
+      // s'édite normalement dans le formulaire, pas via cette fenêtre).
+      if (inv.id !== id || inv.status !== 'finalisée') return inv
+
+      // La date d'échéance a pu changer → recalculer le statut de retard.
+      // Une facture déjà payée le reste (on ne ressuscite pas un retard).
+      const recalculatedPayment =
+        inv.paymentStatus && inv.paymentStatus !== 'payee'
+          ? (dates.dueDate < today ? 'en_retard' as const : 'en_attente' as const)
+          : inv.paymentStatus
+
+      return {
+        ...inv,
+        invoice: {
+          ...inv.invoice,
+          issueDate: dates.issueDate,
+          deliveryDate: dates.deliveryDate,
+          dueDate: dates.dueDate,
+        },
+        paymentStatus: recalculatedPayment,
+        updatedAt: new Date().toISOString(),
+      }
+    })
+
+    setSavedInvoices(updated)
+    savedInvoicesRef.current = updated
+
+    // Si la facture corrigée est celle chargée dans l'éditeur, synchroniser le
+    // formulaire à l'écran. Sans ça : (1) il afficherait encore les anciennes
+    // dates, et (2) la sauvegarde de secours à la fermeture de l'onglet
+    // pourrait réécrire la facture avec ce contenu périmé.
+    if (currentInvoiceIdRef.current === id) {
+      const syncedState = {
+        ...stateRef.current,
+        invoice: {
+          ...stateRef.current.invoice,
+          issueDate: dates.issueDate,
+          deliveryDate: dates.deliveryDate,
+          dueDate: dates.dueDate,
+        },
+      }
+      stateRef.current = syncedState
+      setState(syncedState)
+    }
+
+    const result = await storage.saveInvoices(updated)
+    if (!result.ok) {
+      if (result.reason === 'unknown') toast.error('Erreur de sauvegarde')
+    } else {
+      toast.success('Dates corrigées')
+    }
+  }, [])
+
   // Créer une nouvelle facture vierge
   const newInvoice = useCallback(async () => {
     const newCounter = stateRef.current.counter + 1
@@ -637,6 +717,7 @@ export function useInvoice() {
     deleteInvoice,
     markAsPaid,
     markAsUnpaid,
+    correctInvoiceDates,
     newInvoice,
   }
 }

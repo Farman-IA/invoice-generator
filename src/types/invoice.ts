@@ -70,6 +70,16 @@ export interface InvoiceData {
   items: LineItem[]
 }
 
+// Les 3 seules dates modifiables sur une facture finalisée (correction
+// encadrée). Type partagé pour garantir le MÊME contrat entre le hook, la
+// galerie et la fenêtre de correction — évite que 3 copies de la même forme
+// finissent par diverger.
+export interface InvoiceDateFields {
+  issueDate: string
+  deliveryDate: string
+  dueDate: string
+}
+
 export interface InvoiceState {
   issuer: IssuerProfile
   client: ClientInfo

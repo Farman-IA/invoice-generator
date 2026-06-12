@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Copy, Trash2, Download, FileText, CheckCircle, Search, X, ArrowUpDown, SlidersHorizontal, AlertTriangle, FolderOpen } from 'lucide-react'
+import { Copy, Trash2, Download, FileText, CheckCircle, Search, X, ArrowUpDown, SlidersHorizontal, AlertTriangle, FolderOpen, CalendarCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -12,7 +12,8 @@ import {
   DialogClose,
 } from '@/components/ui/dialog'
 import { DocumentThumbnail } from '@/components/DocumentThumbnail'
-import type { SavedInvoice, PaymentStatus } from '@/types/invoice'
+import { CorrectDatesDialog } from '@/components/CorrectDatesDialog'
+import type { SavedInvoice, PaymentStatus, InvoiceDateFields } from '@/types/invoice'
 import { calculateTotals, formatEuro } from '@/lib/calculations'
 
 type StatusFilter = 'tous' | 'brouillon' | 'finalisée'
@@ -27,6 +28,7 @@ interface InvoiceGalleryProps {
   onDownload: (id: string) => void
   onMarkPaid: (id: string) => void
   onMarkUnpaid: (id: string) => void
+  onCorrectDates: (id: string, dates: InvoiceDateFields) => void
 }
 
 const PAYMENT_BADGE: Record<PaymentStatus, { label: string; className: string }> = {
@@ -36,9 +38,11 @@ const PAYMENT_BADGE: Record<PaymentStatus, { label: string; className: string }>
 }
 
 export function InvoiceGallery({
-  invoices, onEdit, onDuplicate, onDelete, onDownload, onMarkPaid, onMarkUnpaid,
+  invoices, onEdit, onDuplicate, onDelete, onDownload, onMarkPaid, onMarkUnpaid, onCorrectDates,
 }: InvoiceGalleryProps) {
   const [deleteTarget, setDeleteTarget] = useState<SavedInvoice | null>(null)
+  // Facture dont on est en train de corriger les dates (null = fenêtre fermée)
+  const [correctTarget, setCorrectTarget] = useState<SavedInvoice | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('tous')
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('tous')
@@ -237,6 +241,13 @@ export function InvoiceGallery({
                       <Download className="size-3" />
                     </Button>
                   )}
+                  {/* Corriger les dates : réservé aux factures finalisées (un
+                      brouillon s'édite directement dans le formulaire). */}
+                  {!isBrouillon && (
+                    <Button variant="ghost" size="icon-xs" onClick={() => setCorrectTarget(invoice)} title="Corriger les dates" aria-label="Corriger les dates" className="text-blue-500">
+                      <CalendarCog className="size-3" />
+                    </Button>
+                  )}
                   {!isBrouillon && invoice.paymentStatus !== 'payee' && (
                     <Button variant="ghost" size="icon-xs" onClick={() => onMarkPaid(invoice.id)} title="Payée" aria-label="Marquer payée" className="text-emerald-500">
                       <CheckCircle className="size-3" />
@@ -281,6 +292,14 @@ export function InvoiceGallery({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Fenêtre de correction des dates (factures finalisées). On ferme en
+          remettant la cible à null ; la confirmation délègue à onCorrectDates. */}
+      <CorrectDatesDialog
+        invoice={correctTarget}
+        onClose={() => setCorrectTarget(null)}
+        onConfirm={(id, dates) => { onCorrectDates(id, dates); setCorrectTarget(null) }}
+      />
     </>
   )
 }

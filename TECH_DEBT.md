@@ -96,3 +96,27 @@ clôture (idéalement chiffré ou conditionné à un événement).
 - **Critère de clôture** : "1b" à traiter si un doublon de ligne multi-tours
   est observé en usage réel ; le reste au prochain passage sur les fichiers
   concernés.
+
+### 2026-06-12 — Suggestions différées de l'audit "correction des dates"
+- **Périmètre** (suggestions /review-code non bloquantes — le BLOCKING et les
+  4 CRITICAL de l'audit ont été corrigés dans la session) :
+  - **Faux toast "Dates corrigées"** si la facture ciblée a été supprimée dans
+    un autre onglet pendant que la fenêtre est ouverte : `correctInvoiceDates`
+    fait alors un `map` no-op mais sauvegarde et affiche un succès. Même travers
+    que `markAsPaid`/`deleteInvoice`. Piste : drapeau `found` dans le `map` →
+    `toast.error('Facture introuvable')` + `return` si non trouvée.
+  - **Hiérarchie des messages dans la fenêtre** (`CorrectDatesDialog.tsx`) :
+    l'avertissement légal ("ne corriger que si pas encore transmise") est en gris
+    discret, alors que l'encart amber (info secondaire) attire l'œil. Piste :
+    remonter la phrase légale dans un encart `AlertTriangle` dédié.
+  - **Contrastes WCAG mineurs** : "(optionnelle)" en `text-gray-400` (~2,5:1) et
+    anneau de focus `focus:ring-blue-200` (~1,4:1) sous le seuil. Hérités du
+    champ recherche de la galerie → à harmoniser globalement, pas en isolé.
+  - **Cibles tactiles < 44px** sur la rangée d'actions des cartes de la galerie
+    (`InvoiceGallery.tsx`) : concerne TOUTE la rangée (télécharger / payé /
+    supprimer / corriger), pré-existant. À agrandir globalement sous `sm:`.
+- **Raison du report** : Farman a choisi le périmètre "bloquant + critiques".
+  Ces points sont du confort/accessibilité fine, pas de la sûreté monétaire.
+- **Critère de clôture** : contrastes + cibles tactiles à reprendre lors d'une
+  passe accessibilité globale sur la galerie ; le faux toast au prochain passage
+  sur `useInvoice.ts` (idéalement avec la même garde sur les fonctions voisines).
