@@ -27,6 +27,7 @@ import { useTheme } from "@/hooks/useTheme";
 import {
   buildItemsFromAI,
   buildMetaUpdateFromAI,
+  buildQuoteMetaUpdateFromAI,
   mergeClientFromAI,
 } from "@/lib/applyAIData";
 import { round2 } from "@/lib/money";
@@ -363,6 +364,51 @@ function App() {
       }
     },
     [view, inv, findByName],
+  );
+
+  // Version DEVIS de handleApplyAIData : même logique, mais elle cible le hook
+  // des devis (qt) au lieu des factures (inv). Les briques de transformation
+  // (mergeClientFromAI, buildItemsFromAI) sont communes — seules les
+  // métadonnées diffèrent (un devis n'a pas d'acompte → buildQuoteMetaUpdateFromAI).
+  const handleApplyAIDataQuote = useCallback(
+    (data: ParsedInvoiceData) => {
+      const isNewQuote = view !== "QUOTE_EDIT";
+      const hasClient = !!(data.clientName && data.clientName.trim() !== "");
+      const hasItems = data.items?.length > 0;
+
+      const applyData = () => {
+        const clientUpdate = mergeClientFromAI(data, isNewQuote, findByName);
+        if (clientUpdate) qt.updateClient(clientUpdate);
+
+        if (hasItems) {
+          const priceMode = qt.state.issuer.priceMode ?? "ht";
+          const newItems = buildItemsFromAI(data, priceMode);
+          // Modification d'articles seuls : on ajoute aux existants.
+          // Sinon (nouveau devis, OU client+articles ensemble) : on remplace.
+          if (!isNewQuote && !hasClient) {
+            qt.updateQuote({ items: [...qt.state.quote.items, ...newItems] });
+          } else {
+            qt.updateQuote({ items: newItems });
+          }
+        }
+
+        const metaUpdate = buildQuoteMetaUpdateFromAI(data);
+        if (Object.keys(metaUpdate).length > 0) qt.updateQuote(metaUpdate);
+
+        toast.success("Devis mis à jour par l'IA");
+      };
+
+      // Si pas en mode édition devis, créer un nouveau devis et attendre le rendu
+      if (isNewQuote) {
+        qt.newQuote().then(() => {
+          setGlobalView("QUOTE_EDIT");
+          setTimeout(applyData, 0);
+        });
+      } else {
+        applyData();
+      }
+    },
+    [view, qt, findByName],
   );
 
   if (inv.isLoading) {
@@ -711,36 +757,49 @@ function App() {
       )}
 
       {view === "QUOTE_EDIT" && (
-        <div className="py-8 px-4">
-          <InvoiceDocument
-            ref={docRef}
-            mode="quote"
-            issuer={qt.state.issuer}
-            client={qt.state.client}
-            invoice={qt.state.quote}
-            logo={logo}
-            onUpdateLogo={qt.isLocked ? () => {} : updateLogo}
-            onUpdateIssuer={qt.isLocked ? () => {} : qt.updateIssuer}
-            onUpdateClient={qt.isLocked ? () => {} : qt.updateClient}
-            onUpdateInvoice={qt.isLocked ? () => {} : qt.updateQuote}
-            onAddLine={qt.isLocked ? () => {} : () => qt.addLineItem()}
-            onRemoveLine={qt.isLocked ? () => {} : qt.removeLineItem}
-            onUpdateLine={qt.isLocked ? () => {} : qt.updateLineItem}
-            findClientByName={qt.isLocked ? undefined : findByName}
-            onSelectClient={qt.isLocked ? undefined : handleSelectClient}
-            templates={qt.isLocked ? undefined : templates}
-            onSaveAsTemplate={qt.isLocked ? undefined : handleSaveAsTemplate}
-            onInsertTemplate={qt.isLocked ? undefined : handleInsertTemplate}
-            priceMode={qt.state.issuer.priceMode ?? "ht"}
-            onPriceModeChange={
-              qt.isLocked
-                ? undefined
-                : (mode) => {
-                    qt.updateIssuer({ priceMode: mode });
-                    inv.updateIssuer({ priceMode: mode });
-                  }
-            }
-          />
+        <div className="flex">
+          {/* Chat IA — desktop sidebar (même assistant que les factures) */}
+          <div className="hidden lg:block w-80 xl:w-96 shrink-0 sticky top-13.25 h-[calc(100vh-53px)] no-print">
+            <AIChatPanel
+              open
+              onClose={() => {}}
+              onApplyData={handleApplyAIDataQuote}
+              priceMode={qt.state.issuer.priceMode ?? "ht"}
+            />
+          </div>
+
+          {/* Devis */}
+          <div className="flex-1 py-8 px-4 max-w-5xl mx-auto print:p-0 print:max-w-full">
+            <InvoiceDocument
+              ref={docRef}
+              mode="quote"
+              issuer={qt.state.issuer}
+              client={qt.state.client}
+              invoice={qt.state.quote}
+              logo={logo}
+              onUpdateLogo={qt.isLocked ? () => {} : updateLogo}
+              onUpdateIssuer={qt.isLocked ? () => {} : qt.updateIssuer}
+              onUpdateClient={qt.isLocked ? () => {} : qt.updateClient}
+              onUpdateInvoice={qt.isLocked ? () => {} : qt.updateQuote}
+              onAddLine={qt.isLocked ? () => {} : () => qt.addLineItem()}
+              onRemoveLine={qt.isLocked ? () => {} : qt.removeLineItem}
+              onUpdateLine={qt.isLocked ? () => {} : qt.updateLineItem}
+              findClientByName={qt.isLocked ? undefined : findByName}
+              onSelectClient={qt.isLocked ? undefined : handleSelectClient}
+              templates={qt.isLocked ? undefined : templates}
+              onSaveAsTemplate={qt.isLocked ? undefined : handleSaveAsTemplate}
+              onInsertTemplate={qt.isLocked ? undefined : handleInsertTemplate}
+              priceMode={qt.state.issuer.priceMode ?? "ht"}
+              onPriceModeChange={
+                qt.isLocked
+                  ? undefined
+                  : (mode) => {
+                      qt.updateIssuer({ priceMode: mode });
+                      inv.updateIssuer({ priceMode: mode });
+                    }
+              }
+            />
+          </div>
         </div>
       )}
 
@@ -795,8 +854,9 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Chat IA — mobile drawer */}
-      {view === "EDIT" && (
+      {/* Chat IA — mobile drawer (factures ET devis). Le handler et le mode de
+          prix s'adaptent à la vue active : devis → qt, facture → inv. */}
+      {isEditView && (
         <>
           <AIChatBubble
             onClick={() => setShowAIChat(true)}
@@ -815,8 +875,16 @@ function App() {
                 <AIChatPanel
                   open={true}
                   onClose={() => setShowAIChat(false)}
-                  onApplyData={handleApplyAIData}
-                  priceMode={inv.state.issuer.priceMode ?? "ht"}
+                  onApplyData={
+                    view === "QUOTE_EDIT"
+                      ? handleApplyAIDataQuote
+                      : handleApplyAIData
+                  }
+                  priceMode={
+                    (view === "QUOTE_EDIT"
+                      ? qt.state.issuer.priceMode
+                      : inv.state.issuer.priceMode) ?? "ht"
+                  }
                 />
               </div>
             </div>

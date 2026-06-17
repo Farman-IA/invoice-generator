@@ -9,6 +9,7 @@ import type {
   LineItem,
   ParsedInvoiceData,
   PriceMode,
+  QuoteData,
 } from '@/types/invoice'
 
 // Construit la mise a jour client a appliquer.
@@ -130,5 +131,17 @@ export function buildMetaUpdateFromAI(
   if (data.purchaseOrder) update.purchaseOrder = data.purchaseOrder
   if (data.notes) update.notes = data.notes
   if (data.deposit != null && data.deposit > 0) update.deposit = data.deposit
+  return update
+}
+
+// Version DEVIS des metadonnees. Un devis n'a PAS d'acompte (le type QuoteData
+// n'a pas de champ deposit, contrairement a InvoiceData) — on ne reprend donc
+// que le bon de commande et les notes fournis par l'IA.
+export function buildQuoteMetaUpdateFromAI(
+  data: ParsedInvoiceData,
+): Partial<QuoteData> {
+  const update: Partial<QuoteData> = {}
+  if (data.purchaseOrder) update.purchaseOrder = data.purchaseOrder
+  if (data.notes) update.notes = data.notes
   return update
 }
