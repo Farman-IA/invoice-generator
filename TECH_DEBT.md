@@ -6,6 +6,25 @@ clôture (idéalement chiffré ou conditionné à un événement).
 
 ## Ouvertes
 
+### 2026-06-17 — Suggestions audit « IA dans les devis » (non bloquantes)
+- **Périmètre** :
+  - **Duplication des 2 handlers IA** (`handleApplyAIData` / `handleApplyAIDataQuote`
+    dans `App.tsx`, ~40 lignes en miroir) : assumée et documentée. À mutualiser
+    NATURELLEMENT lors du refactor `useDocument` déjà prévu ci-dessous, pas avant.
+  - **`App.tsx` ~900 lignes** : sortir les vues `EDIT` et `QUOTE_EDIT` dans des
+    composants dédiés (`<InvoiceEditView>` / `<QuoteEditView>`) le même jour que
+    le refactor `useDocument` — videra ~150 lignes de JSX d'un coup.
+  - **Tiroir IA mobile sans `role="dialog"` / `Escape` / piège de focus**
+    (`App.tsx`, drawer mobile) : dette héritée (pré-existante, pas introduite par
+    la feature devis). Remplacer le tiroir maison par le composant `Sheet` de
+    shadcn/ui (gère ARIA + focus + Escape nativement, cohérent avec la règle
+    projet « toujours shadcn/ui en priorité »).
+- **Raison du report** : Farman a choisi « tout corriger » sur les BLOCKING +
+  CRITICAL (verrou devis, tiroir cross-document, faux toast, `.catch`). Ces 3
+  points restants sont du confort/lisibilité, sans risque monétaire ni juridique.
+- **Critère de clôture** : duplication + taille `App.tsx` à traiter avec le
+  refactor `useDocument` ; accessibilité du tiroir lors d'une passe shadcn/ui.
+
 ### 2026-05-21 — Refactor `useDocument` + extraction `clientMerge`
 - **Périmètre** :
   - Extraire la logique de merge protégé dans `src/lib/clientMerge.ts`

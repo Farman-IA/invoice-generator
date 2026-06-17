@@ -132,6 +132,13 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showSettings]);
 
+  // Ferme le tiroir IA mobile à chaque changement de document (facture ↔ devis).
+  // Sans ça, un tiroir resté ouvert appliquerait la conversation au mauvais
+  // document après navigation (trouvé par l'audit /review-code).
+  useEffect(() => {
+    setShowAIChat(false);
+  }, [view]);
+
   // Règle CTO #2 : si l'utilisateur a tapé "CNRS" (nom exact) à la main dans
   // l'input client sans cliquer sur la suggestion d'autocomplete, on doit
   // quand même charger ses infos (SIRET, adresse...) depuis le carnet avant
@@ -326,6 +333,12 @@ function App() {
   const handleApplyAIData = useCallback(
     (data: ParsedInvoiceData) => {
       const isNewInvoice = view !== "EDIT";
+      // Garde : une facture finalisée est juridiquement figée — l'IA ne doit
+      // jamais la modifier (défense en profondeur, en plus du panneau masqué).
+      if (!isNewInvoice && inv.isFinalized) {
+        toast.error("Cette facture est finalisée et ne peut plus être modifiée.");
+        return;
+      }
       const hasClient = !!(data.clientName && data.clientName.trim() !== "");
       const hasItems = data.items?.length > 0;
 
@@ -353,12 +366,14 @@ function App() {
         toast.success("Facture mise à jour par l'IA");
       };
 
-      // Si pas en mode édition, créer une nouvelle facture et attendre le rendu
+      // Si pas en mode édition, créer une nouvelle facture et attendre le rendu.
+      // .catch : si la création échoue (ex: stockage plein), on prévient au lieu
+      // d'un échec silencieux où l'utilisateur a parlé à l'IA sans résultat.
       if (isNewInvoice) {
         inv.newInvoice().then(() => {
           setGlobalView("EDIT");
           setTimeout(applyData, 0);
-        });
+        }).catch(() => toast.error("Impossible de créer la facture. Réessayez."));
       } else {
         applyData();
       }
@@ -373,6 +388,12 @@ function App() {
   const handleApplyAIDataQuote = useCallback(
     (data: ParsedInvoiceData) => {
       const isNewQuote = view !== "QUOTE_EDIT";
+      // Garde : un devis verrouillé (envoyé/accepté/refusé) est juridiquement
+      // engagé — l'IA ne doit jamais le modifier (défense en profondeur).
+      if (!isNewQuote && qt.isLocked) {
+        toast.error("Ce devis est verrouillé et ne peut plus être modifié.");
+        return;
+      }
       const hasClient = !!(data.clientName && data.clientName.trim() !== "");
       const hasItems = data.items?.length > 0;
 
@@ -398,12 +419,13 @@ function App() {
         toast.success("Devis mis à jour par l'IA");
       };
 
-      // Si pas en mode édition devis, créer un nouveau devis et attendre le rendu
+      // Si pas en mode édition devis, créer un nouveau devis et attendre le rendu.
+      // .catch : voir handleApplyAIData — pas d'échec silencieux.
       if (isNewQuote) {
         qt.newQuote().then(() => {
           setGlobalView("QUOTE_EDIT");
           setTimeout(applyData, 0);
-        });
+        }).catch(() => toast.error("Impossible de créer le devis. Réessayez."));
       } else {
         applyData();
       }
@@ -420,6 +442,13 @@ function App() {
   }
 
   const isEditView = view === "EDIT" || view === "QUOTE_EDIT";
+  // L'assistant IA n'est disponible que sur un document ÉDITABLE. Un devis
+  // verrouillé ou une facture finalisée est juridiquement figé : afficher l'IA
+  // dessus laisserait croire qu'on peut le modifier (faux toast "mis à jour")
+  // et, pire, une modif pouvait être persistée en douce (cf. audit).
+  const aiAvailable =
+    (view === "EDIT" && !inv.isFinalized) ||
+    (view === "QUOTE_EDIT" && !qt.isLocked);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 print:bg-white print:min-h-0">
@@ -707,15 +736,18 @@ function App() {
 
       {view === "EDIT" && (
         <div className="flex">
-          {/* Chat IA — desktop sidebar */}
-          <div className="hidden lg:block w-80 xl:w-96 shrink-0 sticky top-13.25 h-[calc(100vh-53px)] no-print">
-            <AIChatPanel
-              open
-              onClose={() => {}}
-              onApplyData={handleApplyAIData}
-              priceMode={inv.state.issuer.priceMode ?? "ht"}
-            />
-          </div>
+          {/* Chat IA — desktop sidebar (masqué si facture finalisée : un
+              document figé ne doit pas pouvoir être modifié par l'IA) */}
+          {!inv.isFinalized && (
+            <div className="hidden lg:block w-80 xl:w-96 shrink-0 sticky top-13.25 h-[calc(100vh-53px)] no-print">
+              <AIChatPanel
+                open
+                onClose={() => {}}
+                onApplyData={handleApplyAIData}
+                priceMode={inv.state.issuer.priceMode ?? "ht"}
+              />
+            </div>
+          )}
 
           {/* Facture */}
           <div className="flex-1 py-8 px-4 max-w-5xl mx-auto print:p-0 print:max-w-full">
@@ -758,15 +790,18 @@ function App() {
 
       {view === "QUOTE_EDIT" && (
         <div className="flex">
-          {/* Chat IA — desktop sidebar (même assistant que les factures) */}
-          <div className="hidden lg:block w-80 xl:w-96 shrink-0 sticky top-13.25 h-[calc(100vh-53px)] no-print">
-            <AIChatPanel
-              open
-              onClose={() => {}}
-              onApplyData={handleApplyAIDataQuote}
-              priceMode={qt.state.issuer.priceMode ?? "ht"}
-            />
-          </div>
+          {/* Chat IA — desktop sidebar (masqué si devis verrouillé :
+              envoyé/accepté/refusé = juridiquement engagé) */}
+          {!qt.isLocked && (
+            <div className="hidden lg:block w-80 xl:w-96 shrink-0 sticky top-13.25 h-[calc(100vh-53px)] no-print">
+              <AIChatPanel
+                open
+                onClose={() => {}}
+                onApplyData={handleApplyAIDataQuote}
+                priceMode={qt.state.issuer.priceMode ?? "ht"}
+              />
+            </div>
+          )}
 
           {/* Devis */}
           <div className="flex-1 py-8 px-4 max-w-5xl mx-auto print:p-0 print:max-w-full">
@@ -854,9 +889,10 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Chat IA — mobile drawer (factures ET devis). Le handler et le mode de
-          prix s'adaptent à la vue active : devis → qt, facture → inv. */}
-      {isEditView && (
+      {/* Chat IA — mobile drawer (factures ET devis). Affiché seulement si le
+          document est éditable (pas finalisé/verrouillé). Le handler et le mode
+          de prix s'adaptent à la vue active : devis → qt, facture → inv. */}
+      {aiAvailable && (
         <>
           <AIChatBubble
             onClick={() => setShowAIChat(true)}
@@ -872,7 +908,11 @@ function App() {
                 className="absolute inset-y-0 left-0 w-80 max-w-[85vw] shadow-xl transition-transform duration-200"
                 style={{ animation: "slideInLeft 200ms ease-out" }}
               >
+                {/* key={view} : remonte le panneau (et réinitialise la
+                    conversation) quand on passe de facture à devis, pour ne
+                    jamais appliquer un échange au mauvais document. */}
                 <AIChatPanel
+                  key={view}
                   open={true}
                   onClose={() => setShowAIChat(false)}
                   onApplyData={

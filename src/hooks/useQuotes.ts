@@ -249,6 +249,12 @@ export function useQuotes() {
     const now = new Date().toISOString()
     const current = stateRef.current
     const quoteId = currentQuoteIdRef.current
+    // Symétrie avec useInvoice (flushSync) : un devis non-brouillon
+    // (envoyé/accepté/refusé) est juridiquement engagé — la sauvegarde de
+    // secours ne doit JAMAIS le réécrire avec le contenu courant du
+    // formulaire, sinon une modification faite à l'écran sur un devis
+    // verrouillé serait persistée à la fermeture de l'onglet.
+    if (quoteId && savedQuotesRef.current.find(q => q.id === quoteId)?.status !== 'brouillon') return null
     let quotes: SavedQuote[]
     if (quoteId) {
       quotes = savedQuotesRef.current.map(q =>
