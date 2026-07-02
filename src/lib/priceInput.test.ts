@@ -79,6 +79,37 @@ describe('buildPricePatch — mode HT : préservation de l\'ancre TTC existante'
     const item = makeItem({ quantity: 1, unitPrice: 618.18, unitPriceTTC: 680, vatRate: 10 })
     expect(buildPricePatch(item, '600', false)).toEqual({ unitPrice: 600, unitPriceTTC: undefined })
   })
+
+  it('le patch d\'effacement traverse mergeLineItem : l\'ancre TTC disparaît VRAIMENT (chemin de prod)', () => {
+    // Verrou anti-régression (finding CRITICAL de l'audit du 02/07/2026) :
+    // useInvoice.updateLineItem applique les patchs via mergeLineItem. Si un
+    // futur refactor de mergeLineItem filtrait les clés `undefined` du patch,
+    // le retour au mode HT laisserait un TTC fantôme — et AUCUN autre test ne
+    // le verrait. Celui-ci, si.
+    const item = makeItem({ quantity: 1, unitPrice: 618.18, unitPriceTTC: 680, vatRate: 10 })
+    const patch = buildPricePatch(item, '600', false)
+    const merged = mergeLineItem(item, patch!)
+    expect(merged.unitPriceTTC).toBeUndefined()
+    expect(merged.unitPrice).toBe(600)
+    // Et le groupe de TVA doit bien être revenu en mode HT pur :
+    // TVA = 600 × 10 % = 60 (et non TTC − HT qui donnerait autre chose)
+    const totals = calculateTotals([merged])
+    expect(totals.vatBreakdown[0]).toEqual({ rate: 10, baseHT: 600, vatAmount: 60 })
+  })
+
+  it('champ vidé (chaîne vide) = prix à 0 SANS ancre fantôme — comportement assumé et documenté', () => {
+    // Number('') vaut 0 : vider le champ et valider remet le prix à zéro.
+    // C'est le garde hasEditedRef d'InlineEdit qui protège du blur accidentel ;
+    // tout FUTUR appelant de buildPricePatch sans ce garde doit le savoir.
+    const item = makeItem({ quantity: 1, unitPrice: 618.18, unitPriceTTC: 680, vatRate: 10 })
+    expect(buildPricePatch(item, '', true)).toEqual({ unitPrice: 0, unitPriceTTC: undefined })
+    expect(buildPricePatch(item, '   ', false)).toEqual({ unitPrice: 0, unitPriceTTC: undefined })
+  })
+
+  it('taux 0 % (franchise TVA auto-entrepreneur) : TTC = HT, pas de division ratée', () => {
+    const item = makeItem({ quantity: 1, unitPrice: 0, vatRate: 0 })
+    expect(buildPricePatch(item, '100', true)).toEqual({ unitPrice: 100, unitPriceTTC: 100 })
+  })
 })
 
 describe('scénario complet du 01/07/2026 — facture 680 + 700 TTC @ 10 % et 350 TTC @ 20 %', () => {

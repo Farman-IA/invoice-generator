@@ -27,10 +27,13 @@ export function InlineEdit({
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
-  // Post-it interne : « une frappe clavier a eu lieu pendant cette édition ».
-  // Distingue une vraie re-saisie (efface + retape le même texte) d'un simple
-  // clic-dans-la-case puis clic-ailleurs — regarder ne doit jamais modifier.
-  const hasTypedRef = useRef(false)
+  // Post-it interne : « le contenu a réellement divergé de la valeur affichée
+  // pendant cette session d'édition » — par frappe, collage, spinner, dictée
+  // vocale ou autofill (tout passe par onChange, pas seulement le clavier).
+  // Distingue une vraie re-saisie (efface + retape le même texte : le champ
+  // passe par un état différent) d'un simple clic-dans-la-case puis
+  // clic-ailleurs — regarder ne doit jamais modifier.
+  const hasEditedRef = useRef(false)
 
   useEffect(() => {
     setDraft(value)
@@ -38,8 +41,8 @@ export function InlineEdit({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      // Nouvelle session d'édition : aucune frappe enregistrée pour l'instant
-      hasTypedRef.current = false
+      // Nouvelle session d'édition : aucune modification enregistrée pour l'instant
+      hasEditedRef.current = false
       inputRef.current.focus()
       if (as !== 'date') {
         // requestAnimationFrame garantit que l'input est rendu avant de sélectionner
@@ -51,13 +54,13 @@ export function InlineEdit({
   const handleBlur = () => {
     setIsEditing(false)
     // Texte différent → notification classique. Texte identique → notification
-    // seulement si demandé (notifyUnchanged) ET si une frappe a réellement eu
-    // lieu (sinon un simple aller-retour de focus déclencherait des mises à
-    // jour fantômes sur toutes les factures).
-    if (draft !== value || (notifyUnchanged && hasTypedRef.current)) {
+    // seulement si demandé (notifyUnchanged) ET si le contenu a réellement
+    // divergé pendant la session (sinon un simple aller-retour de focus
+    // déclencherait des mises à jour fantômes sur toutes les factures).
+    if (draft !== value || (notifyUnchanged && hasEditedRef.current)) {
       onChange(draft)
     }
-    hasTypedRef.current = false
+    hasEditedRef.current = false
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -66,9 +69,9 @@ export function InlineEdit({
       ;(e.target as HTMLElement).blur()
     }
     if (e.key === 'Escape') {
-      // Échap = annulation : on oublie aussi les frappes, sinon le blur qui
-      // suit re-notifierait la valeur annulée comme une re-saisie volontaire.
-      hasTypedRef.current = false
+      // Échap = annulation : on oublie aussi les modifications, sinon le blur
+      // qui suit re-notifierait la valeur annulée comme une re-saisie volontaire.
+      hasEditedRef.current = false
       setDraft(value)
       setIsEditing(false)
     }
@@ -101,7 +104,13 @@ export function InlineEdit({
         <textarea
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           value={draft}
-          onChange={e => { hasTypedRef.current = true; setDraft(e.target.value) }}
+          onChange={e => {
+            // Le post-it ne se pose que si le contenu DIVERGE de la valeur
+            // d'origine : une correction avortée (dictée, accent annulé) qui
+            // reproduit exactement le texte affiché ne compte pas comme édition.
+            if (e.target.value !== value) hasEditedRef.current = true
+            setDraft(e.target.value)
+          }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className={cn(inputClasses, 'resize-none min-h-[4rem]')}
@@ -115,7 +124,10 @@ export function InlineEdit({
         ref={inputRef as React.RefObject<HTMLInputElement>}
         type={as === 'number' ? 'number' : as === 'date' ? 'date' : 'text'}
         value={draft}
-        onChange={e => { hasTypedRef.current = true; setDraft(e.target.value) }}
+        onChange={e => {
+          if (e.target.value !== value) hasEditedRef.current = true
+          setDraft(e.target.value)
+        }}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         step={as === 'number' ? '0.01' : undefined}
