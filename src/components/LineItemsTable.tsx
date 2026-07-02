@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/select'
 import { InlineEdit } from '@/components/InlineEdit'
 import { calculateLineTotal, formatEuro } from '@/lib/calculations'
-import { round2, getEffectiveUnitPriceHT } from '@/lib/money'
+import { round2 } from '@/lib/money'
+import { buildPricePatch } from '@/lib/priceInput'
 import { VAT_RATES, PLACEHOLDERS } from '@/lib/constants'
 import type { LineItem, VatRate, ArticleTemplate, PriceMode } from '@/types/invoice'
 
@@ -155,31 +156,14 @@ export function LineItemsTable({
                 <td className="py-2.5 px-2 text-right">
                   <InlineEdit
                     value={String(displayUnitPrice)}
+                    // notifyUnchanged : en mode TTC, retaper le montant déjà
+                    // affiché est une décision (ancrer ce TTC comme référence),
+                    // pas un no-op. La règle « que stocker ? » vit dans
+                    // lib/priceInput.ts — testée, partagée, hors du composant.
+                    notifyUnchanged
                     onChange={(v) => {
-                      // round2 sur la saisie : ce que l'utilisateur tape (et voit)
-                      // EST ce qui est stocké. Plus de divergence entre 29,52 affiché
-                      // et 29,5166 utilisé en calcul.
-                      const newPrice = round2(Math.max(0, Number(v) || 0))
-                      if (isTTCMode) {
-                        // Mode TTC : on stocke le TTC saisi tel quel, le HT
-                        // est dérivé arrondi à 2 décimales pour rester comptable.
-                        const newHT = round2(newPrice / (1 + item.vatRate / 100))
-                        onUpdate(item.id, { unitPrice: newHT, unitPriceTTC: newPrice })
-                      } else {
-                        // Mode HT : si l'utilisateur retape la même valeur HT que
-                        // celle déjà affichée (no-op fréquent en validant le champ),
-                        // on PRÉSERVE l'ancrage TTC original — sinon un cycle
-                        // TTC→HT→sauvegarde sans modif efface le TTC saisi originel
-                        // et fait dériver la valeur d'arrondi en arrondi.
-                        const currentHTAffiche = getEffectiveUnitPriceHT(
-                          item.unitPrice, item.unitPriceTTC, item.vatRate
-                        )
-                        if (newPrice === currentHTAffiche && item.unitPriceTTC != null) {
-                          return // no-op, on conserve le TTC d'origine
-                        }
-                        // Sinon : nouveau HT saisi, on efface unitPriceTTC fantôme.
-                        onUpdate(item.id, { unitPrice: newPrice, unitPriceTTC: undefined })
-                      }
+                      const patch = buildPricePatch(item, v, isTTCMode)
+                      if (patch) onUpdate(item.id, patch)
                     }}
                     as="number"
                     className="text-right w-full"

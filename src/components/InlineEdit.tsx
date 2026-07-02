@@ -7,6 +7,13 @@ interface InlineEditProps {
   placeholder?: string
   as?: 'text' | 'number' | 'textarea' | 'date'
   className?: string
+  // Par défaut, valider un texte identique à celui affiché est ignoré (aucun
+  // onChange). Ce réglage force la notification quand l'utilisateur a
+  // RÉELLEMENT tapé quelque chose — nécessaire pour le champ prix : en mode
+  // TTC, retaper le même montant que le TTC dérivé affiché change le SENS du
+  // prix (il devient un TTC sacré) sans changer le texte. Sans ce réglage, la
+  // re-saisie était avalée et l'ancre TTC jamais posée (bug du 01/07/2026).
+  notifyUnchanged?: boolean
 }
 
 export function InlineEdit({
@@ -15,10 +22,15 @@ export function InlineEdit({
   placeholder = '',
   as = 'text',
   className = '',
+  notifyUnchanged = false,
 }: InlineEditProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  // Post-it interne : « une frappe clavier a eu lieu pendant cette édition ».
+  // Distingue une vraie re-saisie (efface + retape le même texte) d'un simple
+  // clic-dans-la-case puis clic-ailleurs — regarder ne doit jamais modifier.
+  const hasTypedRef = useRef(false)
 
   useEffect(() => {
     setDraft(value)
@@ -26,6 +38,8 @@ export function InlineEdit({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
+      // Nouvelle session d'édition : aucune frappe enregistrée pour l'instant
+      hasTypedRef.current = false
       inputRef.current.focus()
       if (as !== 'date') {
         // requestAnimationFrame garantit que l'input est rendu avant de sélectionner
@@ -36,9 +50,14 @@ export function InlineEdit({
 
   const handleBlur = () => {
     setIsEditing(false)
-    if (draft !== value) {
+    // Texte différent → notification classique. Texte identique → notification
+    // seulement si demandé (notifyUnchanged) ET si une frappe a réellement eu
+    // lieu (sinon un simple aller-retour de focus déclencherait des mises à
+    // jour fantômes sur toutes les factures).
+    if (draft !== value || (notifyUnchanged && hasTypedRef.current)) {
       onChange(draft)
     }
+    hasTypedRef.current = false
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -47,6 +66,9 @@ export function InlineEdit({
       ;(e.target as HTMLElement).blur()
     }
     if (e.key === 'Escape') {
+      // Échap = annulation : on oublie aussi les frappes, sinon le blur qui
+      // suit re-notifierait la valeur annulée comme une re-saisie volontaire.
+      hasTypedRef.current = false
       setDraft(value)
       setIsEditing(false)
     }
@@ -79,7 +101,7 @@ export function InlineEdit({
         <textarea
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           value={draft}
-          onChange={e => setDraft(e.target.value)}
+          onChange={e => { hasTypedRef.current = true; setDraft(e.target.value) }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className={cn(inputClasses, 'resize-none min-h-[4rem]')}
@@ -93,7 +115,7 @@ export function InlineEdit({
         ref={inputRef as React.RefObject<HTMLInputElement>}
         type={as === 'number' ? 'number' : as === 'date' ? 'date' : 'text'}
         value={draft}
-        onChange={e => setDraft(e.target.value)}
+        onChange={e => { hasTypedRef.current = true; setDraft(e.target.value) }}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         step={as === 'number' ? '0.01' : undefined}
